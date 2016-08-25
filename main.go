@@ -1,13 +1,14 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
-	_ "github.com/lib/pq"
-	"net"
-	nurl "net/url"
 	"os"
 	"strings"
+  "net"
+  nurl "net/url"
+  _ "github.com/lib/pq"
+  "database/sql"
+  //"github.com/codegangsta/cli"
 )
 
 var DB, ERR = sql.Open("postgres", "postgres://admin:@localhost:5432/visit?sslmode=disable")
@@ -36,34 +37,64 @@ func getTableName() (t_names []string) {
 	return
 }
 
-func writeModel(t_names []string) {
+func getPrimaryKey(t_name string) (c_names map[string]bool){
+  query :=
+    `
+    select
+    ccu.column_name as COLUMN_NAME
+    from
+      information_schema.table_constraints tc
+      ,information_schema.constraint_column_usage ccu
+    where
+      tc.table_name='` + t_name + `'
+      and
+      tc.constraint_type='PRIMARY KEY'
+      and
+      tc.table_catalog=ccu.table_catalog
+      and
+      tc.table_schema=ccu.table_schema
+      and
+      tc.table_name=ccu.table_name
+      and
+      tc.constraint_name=ccu.constraint_name
+    `
+
+  rows, err := DB.Query(query)
+  checkError(err)
+
+  c_names = map[string]bool{}
+  for rows.Next() {
+    var c_name string
+    err = rows.Scan(&c_name)
+    checkError(err)
+
+    c_names[c_name] = true
+  }
+
+  return
+}
+
+func genModel(t_names []string) {
 	for _, t_name := range t_names {
 
-		// query := `
-		//   select column_name, data_type, COALESCE(column_default, '') as column_default
-		//   from information_schema.columns
-		//   where
-		//   table_catalog='` + `visit` + `'
-		//   and
-		//   table_name='` + t_name + `'
-		//   order by
-		//   ordinal_position;
-		//   `
-		query := `
+    primary_key := getPrimaryKey(t_name)
+
+		query :=
+      `
       select column_name, data_type, COALESCE(column_default, '') as column_default
       from information_schema.columns
       where
-      table_name='` + t_name + `'
+        table_name='` + t_name + `'
       order by
-      ordinal_position;
+        ordinal_position;
       `
 
 		fmt.Println(query)
 		rows, err := DB.Query(query)
 		checkError(err)
 
-		model_str := "type " + gormTableName(t_name) + " struct {\n"
-		for rows.Next() {
+		var model_str string
+    for rows.Next() {
 			var (
 				column_name    string
 				data_type      string
@@ -71,18 +102,37 @@ func writeModel(t_names []string) {
 			)
 			err = rows.Scan(&column_name, &data_type, &column_default)
 			checkError(err)
-			m := gormColName(column_name) + " " + gormDataType(data_type) + "\n"
+      json := genj(column_name, column_default, primary_key)
+			m := gormColName(column_name) + " " + gormDataType(data_type) + " `" + json + "`\n"
 			model_str += m
 		}
 
-		model_str = "package models\n\nimport \"time\"\n\n" + model_str + "}"
+		model_str = "package models\n\nimport \"time\"\n\ntype " + gormTableName(t_name) + " struct {\n" + model_str + "}\n"
 
 		fmt.Println(model_str)
+
 		file, err := os.Create(`models/` + t_name + `.go`)
 		checkError(err)
 		defer file.Close()
 		file.Write(([]byte)(model_str))
 	}
+}
+
+// Generate json
+func genj(column_name, column_default string, primary_key map[string]bool) (json string) {
+  json = "json:\"" + column_name + "\""
+
+  if primary_key[column_name] == true {
+    p := "gorm:\"primary_key;AUTO_INCREMENT\" "
+    json = p + json
+  }
+
+  if column_default != "" && !strings.Contains(column_default, "nextval") {
+    d := " sql:\"DEFAULT:" + column_default + "\""
+    json += d
+  }
+
+  return
 }
 
 // Singlarlize table name and upper initial character
@@ -118,7 +168,9 @@ func gormDataType(s string) string {
 	switch s {
 	case "integer":
 		return "uint"
-	case "character", "text":
+  case "numeric":
+    return "float64"
+	case "character varying", "text":
 		return "string"
 	case "boolean":
 		return "bool"
@@ -130,7 +182,7 @@ func gormDataType(s string) string {
 }
 
 // not used
-func ParseURL(url string) (map[string]string, error) {
+func parseURL(url string) (map[string]string, error) {
 	u, err := nurl.Parse(url)
 	if err != nil {
 		return nil, err
@@ -182,5 +234,6 @@ func main() {
 	//a, _ := ParseURL("postgres://admin:@localhost:5432/visit?sslmode=disable")
 	//fmt.Println(a)
 	fmt.Println(test)
-	writeModel(test)
+	genModel(test)
+  fmt.Println(getPrimaryKey("users"))
 }

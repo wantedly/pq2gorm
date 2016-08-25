@@ -4,20 +4,11 @@ import (
   "fmt"
   "strings"
   "os"
-  "github.com/lib/pq"
+  "net"
+  nurl "net/url"
+  _ "github.com/lib/pq"
   "database/sql"
 )
-
-// var (
-//   DB *sql.DBUser
-// )
-
-// var DB = func(dbURL string) *sql.DBUser{
-//         db, err := sql.Open("postgres", dbURL)
-//         checkError(err)
-//         defer db.Close()
-//         return db
-//       }("postgres://admin:@localhost:5432/testdb?sslmode=disable")
 
 var DB, ERR = sql.Open("postgres", "postgres://admin:@localhost:5432/visit?sslmode=disable")
 
@@ -48,12 +39,20 @@ func getTableName() (t_names []string) {
 func writeModel(t_names []string){
   for _, t_name := range t_names {
 
+    // query := `
+    //   select column_name, data_type, COALESCE(column_default, '') as column_default
+    //   from information_schema.columns
+    //   where
+    //   table_catalog='` + `visit` + `'
+    //   and
+    //   table_name='` + t_name + `'
+    //   order by
+    //   ordinal_position;
+    //   `
     query := `
       select column_name, data_type, COALESCE(column_default, '') as column_default
       from information_schema.columns
       where
-      table_catalog='` + `visit` + `'
-      and
       table_name='` + t_name + `'
       order by
       ordinal_position;
@@ -130,20 +129,58 @@ func gormDataType(s string) string {
   }
 }
 
-func Connect(dbURL string) {
-  DB, err := sql.Open("postgres", dbURL)
-  checkError(err)
-  defer DB.Close()
+// not used
+func ParseURL(url string) (map[string]string, error) {
+  u, err := nurl.Parse(url)
+  if err != nil {
+    return nil, err
+  }
+
+  if u.Scheme != "postgres" && u.Scheme != "postgresql" {
+    return nil, fmt.Errorf("invalid connection protocol: %s", u.Scheme)
+  }
+
+  kv := map[string]string{}
+  escaper := strings.NewReplacer(` `, `\ `, `'`, `\'`, `\`, `\\`)
+  accrue := func(k, v string) {
+    if v != "" {
+      kv[k] = escaper.Replace(v)
+    }
+  }
+
+  if u.User != nil {
+    v := u.User.Username()
+    accrue("user", v)
+
+    v, _ = u.User.Password()
+    accrue("password", v)
+  }
+
+  if host, port, err := net.SplitHostPort(u.Host); err != nil {
+    accrue("host", u.Host)
+  } else {
+    accrue("host", host)
+    accrue("port", port)
+  }
+
+  if u.Path != "" {
+    accrue("dbname", u.Path[1:])
+  }
+
+  q := u.Query()
+  for k := range q {
+    accrue(k, q.Get(k))
+  }
+
+  return kv, nil
 }
 
 func main() {
   checkError(ERR)
   defer DB.Close()
-  //Connect("postgres://admin:@localhost:5432/visit?sslmode=disable")
   test := getTableName()
-
+  //a, _ := ParseURL("postgres://admin:@localhost:5432/visit?sslmode=disable")
+  //fmt.Println(a)
   fmt.Println(test)
   writeModel(test)
-  p, _ := pq.ParseURL("postgres://admin:@localhost:5432/visit?sslmode=disable")
-  fmt.Printf("%T", p)
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+  "os/exec"
 	"strings"
   "net"
   nurl "net/url"
@@ -90,7 +91,6 @@ func genModel(t_names []string) {
         ordinal_position;
       `
 
-		fmt.Println(query)
 		rows, err := DB.Query(query)
 		checkError(err)
 
@@ -123,13 +123,16 @@ func genModel(t_names []string) {
 
 		model_str = "package models\n\nimport \"time\"\n\ntype " + gormTableName(t_name) + " struct {\n" + model_str + "}\n"
 
-		fmt.Println(model_str)
+		fmt.Println(model_str) // Print output
 
 		file, err := os.Create(`models/` + inflector.Singularize(t_name) + `.go`)
 		checkError(err)
 		defer file.Close()
 		file.Write(([]byte)(model_str))
 	}
+
+  err := exec.Command("gofmt", "-w", "models").Run()
+  checkError(err)
 }
 
 // Infer belongsTo from column's name

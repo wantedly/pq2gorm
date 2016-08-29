@@ -311,10 +311,6 @@ func parseURL(url string) (map[string]string, error) {
 	return kv, nil
 }
 
-func setDir(c *cli.Context) {
-  fmt.Println(c.Args())
-}
-
 func main() {
 	app := cli.NewApp()
 	app.Name = "pq2gorm"

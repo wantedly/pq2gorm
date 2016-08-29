@@ -95,12 +95,12 @@ func genModel(t_names []string) {
 
 		var model_str string
     for rows.Next() {
-
 			var (
 				column_name    string
 				data_type      string
 				column_default string
 			)
+
 			err = rows.Scan(&column_name, &data_type, &column_default)
 			checkError(err)
 
@@ -111,8 +111,8 @@ func genModel(t_names []string) {
       isInfered, inf_column_name := inferORM(column_name)
       if isInfered == true {
         json := genj(strings.ToLower(inf_column_name), "", nil)
-        comment := "// This line infered from column name."
-        m := inf_column_name + " *" + inf_column_name + " `" + json + "` " + comment + "\n"
+        comment := "// This line is infered from column name " + column_name + "."
+        m := gormColName(inf_column_name) + " *" + gormColName(inf_column_name) + " `" + json + "` " + comment + "\n"
         model_str += m
       }
 		}
@@ -132,6 +132,7 @@ func genModel(t_names []string) {
 func inferORM(s string) (bool, string){
   s = strings.ToLower(s)
   ss := strings.Split(s, "_")
+
   const (
     id  = "id"
   )
@@ -144,14 +145,14 @@ func inferORM(s string) (bool, string){
       continue
     }
 
-    new_ss = append(new_ss, strings.Title(word))
+    new_ss = append(new_ss, word)
   }
 
   if containsID == false || len(new_ss) == 0 {
     return false, ""
   }
 
-  inf_column_name := strings.Join(new_ss, "")
+  inf_column_name := strings.Join(new_ss, "_")
   return true, inf_column_name
 }
 

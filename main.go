@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/codegangsta/cli"
+  //flags "github.com/jessevdk/go-flags"
 	"github.com/gedex/inflector"
 	_ "github.com/lib/pq"
 	"net"
@@ -15,6 +16,7 @@ import (
 )
 
 var DB *sql.DB
+var OutDir = "./"
 
 func checkError(err error) {
 	if err != nil {
@@ -109,7 +111,7 @@ func genModel(t_names []string) {
 
 			json := genj(column_name, column_default, primary_key)
 
-			// if have to use pointer
+			// If have to use pointer
 			if data_type == "timestamp with time zone" && is_nullable == "YES" {
 				if hasNullRecoreds(t_name, column_name) == true {
 					data_type = "*time.Time"
@@ -121,6 +123,7 @@ func genModel(t_names []string) {
 
 			isInfered, inf_column_name := inferORM(column_name)
 
+      // Add belongs_to relation
 			if isInfered == true {
 				json := genj(strings.ToLower(inf_column_name), "", nil)
 				comment := "// This line is infered from column name \"" + column_name + "\"."
@@ -133,9 +136,9 @@ func genModel(t_names []string) {
 
 		model_str = "package models\n\nimport \"time\"\n\ntype " + gormTableName(t_name) + " struct {\n" + model_str + "}\n"
 
-		fmt.Println(model_str) // Print output
+		// fmt.Println(model_str) // Print output
 
-		file, err := os.Create(`models/` + inflector.Singularize(t_name) + `.go`)
+		file, err := os.Create(OutDir + inflector.Singularize(t_name) + `.go`)
 		checkError(err)
 		defer file.Close()
 		file.Write(([]byte)(model_str))
@@ -145,7 +148,7 @@ func genModel(t_names []string) {
 	checkError(err)
 }
 
-// Infer belongsTo from column's name
+// Infer belongs_to Relation from column's name
 func inferORM(s string) (bool, string) {
 	s = strings.ToLower(s)
 	ss := strings.Split(s, "_")
@@ -190,7 +193,6 @@ func genj(column_name, column_default string, primary_key map[string]bool) (json
 	return
 }
 
-//
 func hasNullRecoreds(table_name string, column_name string) bool {
 	query := `SELECT COUNT(*) FROM ` + table_name + ` WHERE ` + column_name + ` IS NULL;`
 
@@ -298,6 +300,10 @@ func parseURL(url string) (map[string]string, error) {
 	return kv, nil
 }
 
+func setDir(c *cli.Context) {
+  fmt.Println(c.Args())
+}
+
 func main() {
 	app := cli.NewApp()
 	app.Name = "pq2gorm"
@@ -307,30 +313,50 @@ func main() {
 	// global options
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
-			Name:  "dryrun, d",
-			Usage: "dryrun mode",
+			Name:  "dry-run, d",
+			Usage: "dry-run",
 		},
 	}
 
 	app.Action = func(c *cli.Context) error {
 
+    // type Options struct {
+    //   Verbose []bool `short:"o" long:"output" description:"Set output directory"`
+    // }
+
+    // var opts Options
+
+    // args, err := flags.Parse(&opts)
+    // if err != nil {
+    //   os.Exit(1)
+    // }
+
+    // OutDir = args[1] + "/"
+
 		var paramFirst = ""
 		if len(c.Args()) > 0 {
-			paramFirst = c.Args()[0]
-		}
+      var isDry = c.GlobalBool("dry-run")
+      if isDry {
+        fmt.Println("this is dry-run")
+      } else {
+  			paramFirst = c.Args()[0]
 
-		db, err := sql.Open("postgres", "postgres://admin:@localhost:5432/visit?sslmode=disable")
-		DB = db
-		checkError(err)
-		defer DB.Close()
-		test := getTableName()
-		//a, _ := ParseURL("postgres://admin:@localhost:5432/visit?sslmode=disable")
-		//fmt.Println(a)
-		fmt.Println(test)
-		genModel(test)
-		fmt.Println(getPrimaryKey("users"))
+        fmt.Printf("Connecting \"%s\"...\n", paramFirst)
 
-		fmt.Println(paramFirst)
+    		db, err := sql.Open("postgres", paramFirst)
+    		DB = db
+    		checkError(err)
+    		defer DB.Close()
+    		tables := getTableName()
+
+    		fmt.Println("Generating gorm from tables below...")
+        for _, table_name := range tables {
+          fmt.Printf("Table name: %s\n", table_name)
+        }
+
+    		genModel(tables)
+      }
+    }
 
 		return nil
 	}

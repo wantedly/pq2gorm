@@ -97,6 +97,7 @@ func genModel(t_names []string) {
 		checkError(err)
 
 		var model_str string
+    var needTimePackage bool
 		for rows.Next() {
 			var (
 				column_name    string
@@ -109,6 +110,10 @@ func genModel(t_names []string) {
 			checkError(err)
 
 			json := genj(column_name, column_default, primary_key)
+
+      if data_type == "timestamp with time zone" {
+        needTimePackage = true
+      }
 
 			// If have to use pointer
 			if data_type == "timestamp with time zone" && is_nullable == "YES" {
@@ -133,7 +138,14 @@ func genModel(t_names []string) {
 			}
 		}
 
-		model_str = "package models\n\nimport \"time\"\n\ntype " + gormTableName(t_name) + " struct {\n" + model_str + "}\n"
+    var importPackage string
+    if needTimePackage {
+      importPackage = "import \"time\"\n\n"
+    } else {
+      importPackage = ""
+    }
+
+		model_str = "package models\n\n" + importPackage + "type " + gormTableName(t_name) + " struct {\n" + model_str + "}\n"
 
 		// fmt.Println(model_str) // Print output
 

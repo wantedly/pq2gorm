@@ -9,6 +9,7 @@ import (
   _ "github.com/lib/pq"
   "database/sql"
   "github.com/codegangsta/cli"
+  "github.com/gedex/inflector"
 )
 
 var DB *sql.DB
@@ -109,10 +110,13 @@ func genModel(t_names []string) {
 			model_str += m
 
       isInfered, inf_column_name := inferORM(column_name)
+
       if isInfered == true {
         json := genj(strings.ToLower(inf_column_name), "", nil)
         comment := "// This line is infered from column name " + column_name + "."
-        m := gormColName(inf_column_name) + " *" + gormColName(inf_column_name) + " `" + json + "` " + comment + "\n"
+        inf_column_name = gormColName(inf_column_name)
+
+        m := inf_column_name + " *" + inf_column_name + " `" + json + "` " + comment + "\n"
         model_str += m
       }
 		}
@@ -121,14 +125,14 @@ func genModel(t_names []string) {
 
 		fmt.Println(model_str)
 
-		file, err := os.Create(`models/` + t_name + `.go`)
+		file, err := os.Create(`models/` + inflector.Singularize(t_name) + `.go`)
 		checkError(err)
 		defer file.Close()
 		file.Write(([]byte)(model_str))
 	}
 }
 
-//
+// Infer belongsTo from column's name
 func inferORM(s string) (bool, string){
   s = strings.ToLower(s)
   ss := strings.Split(s, "_")
@@ -176,9 +180,7 @@ func genj(column_name, column_default string, primary_key map[string]bool) (json
 // Singlarlize table name and upper initial character
 func gormTableName(s string) string {
 	s = strings.ToLower(s)
-	if strings.HasSuffix(s, "s") {
-		s = string([]rune(s)[:len(s)-1])
-	}
+	s = inflector.Singularize(s)
 	return strings.Title(s)
 }
 

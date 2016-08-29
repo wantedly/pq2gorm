@@ -1,16 +1,17 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
+	"github.com/codegangsta/cli"
+	"github.com/gedex/inflector"
+	_ "github.com/lib/pq"
+	"net"
+	nurl "net/url"
 	"os"
-  "os/exec"
+	"os/exec"
+	"strconv"
 	"strings"
-  "net"
-  nurl "net/url"
-  _ "github.com/lib/pq"
-  "database/sql"
-  "github.com/codegangsta/cli"
-  "github.com/gedex/inflector"
 )
 
 var DB *sql.DB
@@ -39,9 +40,9 @@ func getTableName() (t_names []string) {
 	return
 }
 
-func getPrimaryKey(t_name string) (c_names map[string]bool){
-  query :=
-    `
+func getPrimaryKey(t_name string) (c_names map[string]bool) {
+	query :=
+		`
     select
     ccu.column_name as COLUMN_NAME
     from
@@ -61,29 +62,29 @@ func getPrimaryKey(t_name string) (c_names map[string]bool){
       tc.constraint_name=ccu.constraint_name
     `
 
-  rows, err := DB.Query(query)
-  checkError(err)
+	rows, err := DB.Query(query)
+	checkError(err)
 
-  c_names = map[string]bool{}
-  for rows.Next() {
-    var c_name string
-    err = rows.Scan(&c_name)
-    checkError(err)
+	c_names = map[string]bool{}
+	for rows.Next() {
+		var c_name string
+		err = rows.Scan(&c_name)
+		checkError(err)
 
-    c_names[c_name] = true
-  }
+		c_names[c_name] = true
+	}
 
-  return
+	return
 }
 
 func genModel(t_names []string) {
 	for _, t_name := range t_names {
 
-    primary_key := getPrimaryKey(t_name)
+		primary_key := getPrimaryKey(t_name)
 
 		query :=
-      `
-      select column_name, data_type, COALESCE(column_default, '') as column_default
+			`
+      select column_name, data_type, COALESCE(column_default, '') as column_default, is_nullable
       from information_schema.columns
       where
         table_name='` + t_name + `'
@@ -95,30 +96,39 @@ func genModel(t_names []string) {
 		checkError(err)
 
 		var model_str string
-    for rows.Next() {
+		for rows.Next() {
 			var (
 				column_name    string
 				data_type      string
 				column_default string
+				is_nullable    string
 			)
 
-			err = rows.Scan(&column_name, &data_type, &column_default)
+			err = rows.Scan(&column_name, &data_type, &column_default, &is_nullable)
 			checkError(err)
 
-      json := genj(column_name, column_default, primary_key)
+			json := genj(column_name, column_default, primary_key)
+
+			// if have to use pointer
+			if data_type == "timestamp with time zone" && is_nullable == "YES" {
+				if hasNullRecoreds(t_name, column_name) == true {
+					data_type = "*time.Time"
+				}
+			}
+
 			m := gormColName(column_name) + " " + gormDataType(data_type) + " `" + json + "`\n"
 			model_str += m
 
-      isInfered, inf_column_name := inferORM(column_name)
+			isInfered, inf_column_name := inferORM(column_name)
 
-      if isInfered == true {
-        json := genj(strings.ToLower(inf_column_name), "", nil)
-        comment := "// This line is infered from column name " + column_name + "."
-        inf_column_name = gormColName(inf_column_name)
+			if isInfered == true {
+				json := genj(strings.ToLower(inf_column_name), "", nil)
+				comment := "// This line is infered from column name \"" + column_name + "\"."
+				inf_column_name = gormColName(inf_column_name)
 
-        m := inf_column_name + " *" + inf_column_name + " `" + json + "` " + comment + "\n"
-        model_str += m
-      }
+				m := inf_column_name + " *" + inf_column_name + " `" + json + "` " + comment + "\n"
+				model_str += m
+			}
 		}
 
 		model_str = "package models\n\nimport \"time\"\n\ntype " + gormTableName(t_name) + " struct {\n" + model_str + "}\n"
@@ -131,53 +141,71 @@ func genModel(t_names []string) {
 		file.Write(([]byte)(model_str))
 	}
 
-  err := exec.Command("gofmt", "-w", "models").Run()
-  checkError(err)
+	err := exec.Command("gofmt", "-w", "models").Run()
+	checkError(err)
 }
 
 // Infer belongsTo from column's name
-func inferORM(s string) (bool, string){
-  s = strings.ToLower(s)
-  ss := strings.Split(s, "_")
+func inferORM(s string) (bool, string) {
+	s = strings.ToLower(s)
+	ss := strings.Split(s, "_")
 
-  const (
-    id  = "id"
-  )
+	const (
+		id = "id"
+	)
 
-  var new_ss []string
-  var containsID bool = false
-  for _, word := range ss {
-    if word == id {
-      containsID = true
-      continue
-    }
+	var new_ss []string
+	var containsID bool = false
+	for _, word := range ss {
+		if word == id {
+			containsID = true
+			continue
+		}
 
-    new_ss = append(new_ss, word)
-  }
+		new_ss = append(new_ss, word)
+	}
 
-  if containsID == false || len(new_ss) == 0 {
-    return false, ""
-  }
+	if containsID == false || len(new_ss) == 0 {
+		return false, ""
+	}
 
-  inf_column_name := strings.Join(new_ss, "_")
-  return true, inf_column_name
+	inf_column_name := strings.Join(new_ss, "_")
+	return true, inf_column_name
 }
 
 // Generate json
 func genj(column_name, column_default string, primary_key map[string]bool) (json string) {
-  json = "json:\"" + column_name + "\""
+	json = "json:\"" + column_name + "\""
 
-  if primary_key[column_name] == true {
-    p := "gorm:\"primary_key;AUTO_INCREMENT\" "
-    json = p + json
-  }
+	if primary_key[column_name] == true {
+		p := "gorm:\"primary_key;AUTO_INCREMENT\" "
+		json = p + json
+	}
 
-  if column_default != "" && !strings.Contains(column_default, "nextval") {
-    d := " sql:\"DEFAULT:" + column_default + "\""
-    json += d
-  }
+	if column_default != "" && !strings.Contains(column_default, "nextval") {
+		d := " sql:\"DEFAULT:" + column_default + "\""
+		json += d
+	}
 
-  return
+	return
+}
+
+//
+func hasNullRecoreds(table_name string, column_name string) bool {
+	query := `SELECT COUNT(*) FROM ` + table_name + ` WHERE ` + column_name + ` IS NULL;`
+
+	var count string
+
+	err := DB.QueryRow(query).Scan(&count)
+	checkError(err)
+
+	val, _ := strconv.ParseInt(count, 10, 64)
+
+	if val > 0 {
+		return true
+	}
+
+	return false
 }
 
 // Singlarlize table name and upper initial character
@@ -211,8 +239,8 @@ func gormDataType(s string) string {
 	switch s {
 	case "integer":
 		return "uint"
-  case "numeric":
-    return "float64"
+	case "numeric":
+		return "float64"
 	case "character varying", "text":
 		return "string"
 	case "boolean":
@@ -271,49 +299,49 @@ func parseURL(url string) (map[string]string, error) {
 }
 
 func main() {
-  app := cli.NewApp()
-  app.Name = "pq2gorm"
-  app.Usage = "Generate gorm model structs from PostgreSQL database schema"
-  app.Version = "0.0.1"
+	app := cli.NewApp()
+	app.Name = "pq2gorm"
+	app.Usage = "Generate gorm model structs from PostgreSQL database schema"
+	app.Version = "0.0.1"
 
-  // global options
-  app.Flags = []cli.Flag{
-    cli.BoolFlag{
-      Name:  "dryrun, d",
-      Usage: "dryrun mode",
-    },
-  }
+	// global options
+	app.Flags = []cli.Flag{
+		cli.BoolFlag{
+			Name:  "dryrun, d",
+			Usage: "dryrun mode",
+		},
+	}
 
-  app.Action = func (c *cli.Context) error{
+	app.Action = func(c *cli.Context) error {
 
-    var paramFirst = ""
-    if len(c.Args()) > 0 {
-      paramFirst = c.Args()[0]
-    }
+		var paramFirst = ""
+		if len(c.Args()) > 0 {
+			paramFirst = c.Args()[0]
+		}
 
-    db, err := sql.Open("postgres", "postgres://admin:@localhost:5432/visit?sslmode=disable")
-    DB = db
-    checkError(err)
-    defer DB.Close()
-    test := getTableName()
-    //a, _ := ParseURL("postgres://admin:@localhost:5432/visit?sslmode=disable")
-    //fmt.Println(a)
-    fmt.Println(test)
-    genModel(test)
-    fmt.Println(getPrimaryKey("users"))
+		db, err := sql.Open("postgres", "postgres://admin:@localhost:5432/visit?sslmode=disable")
+		DB = db
+		checkError(err)
+		defer DB.Close()
+		test := getTableName()
+		//a, _ := ParseURL("postgres://admin:@localhost:5432/visit?sslmode=disable")
+		//fmt.Println(a)
+		fmt.Println(test)
+		genModel(test)
+		fmt.Println(getPrimaryKey("users"))
 
-    fmt.Println(paramFirst)
+		fmt.Println(paramFirst)
 
-    return nil
-  }
+		return nil
+	}
 
-  app.Before = func(c *cli.Context) error {
-    return nil
-  }
+	app.Before = func(c *cli.Context) error {
+		return nil
+	}
 
-  app.After = func(c *cli.Context) error {
-    return nil
-  }
+	app.After = func(c *cli.Context) error {
+		return nil
+	}
 
-  app.Run(os.Args)
+	app.Run(os.Args)
 }

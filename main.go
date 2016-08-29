@@ -97,7 +97,7 @@ func genModel(t_names []string) {
 		checkError(err)
 
 		var model_str string
-    var needTimePackage bool
+		var needTimePackage bool
 		for rows.Next() {
 			var (
 				column_name    string
@@ -111,9 +111,9 @@ func genModel(t_names []string) {
 
 			json := genj(column_name, column_default, primary_key)
 
-      if data_type == "timestamp with time zone" {
-        needTimePackage = true
-      }
+			if data_type == "timestamp with time zone" {
+				needTimePackage = true
+			}
 
 			// If have to use pointer
 			if data_type == "timestamp with time zone" && is_nullable == "YES" {
@@ -127,7 +127,7 @@ func genModel(t_names []string) {
 
 			isInfered, inf_column_name := inferORM(column_name)
 
-      // Add belongs_to relation
+			// Add belongs_to relation
 			if isInfered == true {
 				json := genj(strings.ToLower(inf_column_name), "", nil)
 				comment := "// This line is infered from column name \"" + column_name + "\"."
@@ -138,12 +138,12 @@ func genModel(t_names []string) {
 			}
 		}
 
-    var importPackage string
-    if needTimePackage {
-      importPackage = "import \"time\"\n\n"
-    } else {
-      importPackage = ""
-    }
+		var importPackage string
+		if needTimePackage {
+			importPackage = "import \"time\"\n\n"
+		} else {
+			importPackage = ""
+		}
 
 		model_str = "package models\n\n" + importPackage + "type " + gormTableName(t_name) + " struct {\n" + model_str + "}\n"
 
@@ -155,7 +155,7 @@ func genModel(t_names []string) {
 		file.Write(([]byte)(model_str))
 	}
 
-	err := exec.Command("gofmt", "-w", "models").Run()
+	err := exec.Command("gofmt", "-w", OutDir).Run()
 	checkError(err)
 }
 
@@ -330,38 +330,38 @@ func main() {
 		var paramFirst = ""
 		if len(c.Args()) > 0 {
 
-      if len(c.Args()) == 2 {
-        OutDir = c.Args()[1] + "/"
-      }
+			if len(c.Args()) == 2 {
+				OutDir = c.Args()[1] + "/"
+			}
 
-      if len(c.Args()) > 2 {
-        fmt.Println("Too many arguments are given")
-        return nil
-      }
+			if len(c.Args()) > 2 {
+				fmt.Println("Too many arguments are given")
+				return nil
+			}
 
-      var isDry = c.GlobalBool("dry-run")
+			var isDry = c.GlobalBool("dry-run")
 
-      if isDry {
-        fmt.Println("this is dry-run")
-      } else {
-  			paramFirst = c.Args()[0]
+			if isDry {
+				fmt.Println("this is dry-run")
+			} else {
+				paramFirst = c.Args()[0]
 
-        fmt.Printf("Connecting \"%s\"...\n", paramFirst)
+				fmt.Printf("Connecting \"%s\"...\n", paramFirst)
 
-    		db, err := sql.Open("postgres", paramFirst)
-    		DB = db
-    		checkError(err)
-    		defer DB.Close()
-    		tables := getTableName()
+				db, err := sql.Open("postgres", paramFirst)
+				DB = db
+				checkError(err)
+				defer DB.Close()
+				tables := getTableName()
 
-    		fmt.Println("Generating gorm from tables below...")
-        for _, table_name := range tables {
-          fmt.Printf("Table name: %s\n", table_name)
-        }
+				fmt.Println("Generating gorm from tables below...")
+				for _, table_name := range tables {
+					fmt.Printf("Table name: %s\n", table_name)
+				}
 
-    		genModel(tables)
-      }
-    }
+				genModel(tables)
+			}
+		}
 
 		return nil
 	}

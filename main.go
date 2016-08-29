@@ -8,10 +8,10 @@ import (
   nurl "net/url"
   _ "github.com/lib/pq"
   "database/sql"
-  //"github.com/codegangsta/cli"
+  "github.com/codegangsta/cli"
 )
 
-var DB, ERR = sql.Open("postgres", "postgres://admin:@localhost:5432/visit?sslmode=disable")
+var DB *sql.DB
 
 func checkError(err error) {
 	if err != nil {
@@ -93,8 +93,10 @@ func genModel(t_names []string) {
 		rows, err := DB.Query(query)
 		checkError(err)
 
+    fmt.Printf("%#v\n", rows)
 		var model_str string
     for rows.Next() {
+
 			var (
 				column_name    string
 				data_type      string
@@ -228,12 +230,49 @@ func parseURL(url string) (map[string]string, error) {
 }
 
 func main() {
-	checkError(ERR)
-	defer DB.Close()
-	test := getTableName()
-	//a, _ := ParseURL("postgres://admin:@localhost:5432/visit?sslmode=disable")
-	//fmt.Println(a)
-	fmt.Println(test)
-	genModel(test)
-  fmt.Println(getPrimaryKey("users"))
+  app := cli.NewApp()
+  app.Name = "pq2gorm"
+  app.Usage = "Generate gorm model structs from PostgreSQL database schema"
+  app.Version = "0.0.1"
+
+  // global options
+  app.Flags = []cli.Flag{
+    cli.BoolFlag{
+      Name:  "dryrun, d",
+      Usage: "dryrun mode",
+    },
+  }
+
+  app.Action = func (c *cli.Context) error{
+
+    var paramFirst = ""
+    if len(c.Args()) > 0 {
+      paramFirst = c.Args()[0]
+    }
+
+    db, err := sql.Open("postgres", "postgres://admin:@localhost:5432/visit?sslmode=disable")
+    DB = db
+    checkError(err)
+    defer DB.Close()
+    test := getTableName()
+    //a, _ := ParseURL("postgres://admin:@localhost:5432/visit?sslmode=disable")
+    //fmt.Println(a)
+    fmt.Println(test)
+    genModel(test)
+    fmt.Println(getPrimaryKey("users"))
+
+    fmt.Println(paramFirst)
+
+    return nil
+  }
+
+  app.Before = func(c *cli.Context) error {
+    return nil
+  }
+
+  app.After = func(c *cli.Context) error {
+    return nil
+  }
+
+  app.Run(os.Args)
 }

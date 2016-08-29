@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/codegangsta/cli"
-  //flags "github.com/jessevdk/go-flags"
 	"github.com/gedex/inflector"
 	_ "github.com/lib/pq"
 	"net"
@@ -320,22 +319,20 @@ func main() {
 
 	app.Action = func(c *cli.Context) error {
 
-    // type Options struct {
-    //   Verbose []bool `short:"o" long:"output" description:"Set output directory"`
-    // }
-
-    // var opts Options
-
-    // args, err := flags.Parse(&opts)
-    // if err != nil {
-    //   os.Exit(1)
-    // }
-
-    // OutDir = args[1] + "/"
-
 		var paramFirst = ""
 		if len(c.Args()) > 0 {
+
+      if len(c.Args()) == 2 {
+        OutDir = c.Args()[1] + "/"
+      }
+
+      if len(c.Args()) > 2 {
+        fmt.Println("Too many arguments are given")
+        return nil
+      }
+
       var isDry = c.GlobalBool("dry-run")
+
       if isDry {
         fmt.Println("this is dry-run")
       } else {

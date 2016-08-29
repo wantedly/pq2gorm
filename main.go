@@ -93,7 +93,6 @@ func genModel(t_names []string) {
 		rows, err := DB.Query(query)
 		checkError(err)
 
-    fmt.Printf("%#v\n", rows)
 		var model_str string
     for rows.Next() {
 
@@ -104,9 +103,18 @@ func genModel(t_names []string) {
 			)
 			err = rows.Scan(&column_name, &data_type, &column_default)
 			checkError(err)
+
       json := genj(column_name, column_default, primary_key)
 			m := gormColName(column_name) + " " + gormDataType(data_type) + " `" + json + "`\n"
 			model_str += m
+
+      isInfered, inf_column_name := inferORM(column_name)
+      if isInfered == true {
+        json := genj(strings.ToLower(inf_column_name), "", nil)
+        comment := "// This line infered from column name."
+        m := inf_column_name + " *" + inf_column_name + " `" + json + "` " + comment + "\n"
+        model_str += m
+      }
 		}
 
 		model_str = "package models\n\nimport \"time\"\n\ntype " + gormTableName(t_name) + " struct {\n" + model_str + "}\n"
@@ -118,6 +126,33 @@ func genModel(t_names []string) {
 		defer file.Close()
 		file.Write(([]byte)(model_str))
 	}
+}
+
+//
+func inferORM(s string) (bool, string){
+  s = strings.ToLower(s)
+  ss := strings.Split(s, "_")
+  const (
+    id  = "id"
+  )
+
+  var new_ss []string
+  var containsID bool = false
+  for _, word := range ss {
+    if word == id {
+      containsID = true
+      continue
+    }
+
+    new_ss = append(new_ss, strings.Title(word))
+  }
+
+  if containsID == false || len(new_ss) == 0 {
+    return false, ""
+  }
+
+  inf_column_name := strings.Join(new_ss, "")
+  return true, inf_column_name
 }
 
 // Generate json

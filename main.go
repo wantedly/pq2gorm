@@ -326,21 +326,15 @@ func main() {
 	flag.Parse()
 
 	if url != "" {
+		fmt.Printf("Connecting to database...\n")
 
-		flag.VisitAll(func(f *flag.Flag) {
-			switch f.Name {
-			case "url":
-				var err error
-				fmt.Printf("Connecting \"%v\"...\n", f.Value)
-				db, err = sql.Open("postgres", fmt.Sprintf("%v", f.Value))
-				checkError(err)
-			case "dir":
-				outDir = fmt.Sprintf("%v/", f.Value)
-			default:
-			}
-		})
-
+		var err error
+		db, err = sql.Open("postgres", url)
+		checkError(err)
 		defer db.Close()
+
+		outDir = dir
+
 		tables := getTableName()
 
 		fmt.Println("Generating gorm from tables below...")

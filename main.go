@@ -4,8 +4,6 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	"net"
-	nurl "net/url"
 	"os"
 	"os/exec"
 	"strconv"
@@ -18,31 +16,29 @@ import (
 var db *sql.DB
 var outDir string
 
-func checkError(err error) {
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "fatal: error: %s", err.Error())
-		os.Exit(1)
-	}
-}
-
-func getTableName() (tableNames []string) {
+func getTableName() ([]string, error) {
 	query := `select relname as TABLE_NAME from pg_stat_user_tables`
 
 	rows, err := db.Query(query)
-	checkError(err)
+	if err != nil {
+		return nil, err
+	}
 
+	tableNames := []string{}
 	for rows.Next() {
 		var tableName string
 		err = rows.Scan(&tableName)
-		checkError(err)
+		if err != nil {
+			return nil, err
+		}
 
 		tableNames = append(tableNames, tableName)
 	}
 
-	return
+	return tableNames, nil
 }
 
-func getPrimaryKeys(tableName string) (primaryKeys map[string]bool) {
+func getPrimaryKeys(tableName string) (map[string]bool, error) {
 	query :=
 		`
     select
@@ -65,24 +61,31 @@ func getPrimaryKeys(tableName string) (primaryKeys map[string]bool) {
     `
 
 	rows, err := db.Query(query)
-	checkError(err)
+	if err != nil {
+		return nil, err
+	}
 
-	primaryKeys = map[string]bool{}
+	primaryKeys := map[string]bool{}
 	for rows.Next() {
 		var columnName string
 		err = rows.Scan(&columnName)
-		checkError(err)
+		if err != nil {
+			return nil, err
+		}
 
 		primaryKeys[columnName] = true
 	}
 
-	return
+	return primaryKeys, nil
 }
 
-func genModel(tableNames []string) {
+func genModel(tableNames []string) error {
 	for _, tableName := range tableNames {
 
-		primaryKeys := getPrimaryKeys(tableName)
+		primaryKeys, err := getPrimaryKeys(tableName)
+		if err != nil {
+			return err
+		}
 
 		query :=
 			`
@@ -95,7 +98,9 @@ func genModel(tableNames []string) {
       `
 
 		rows, err := db.Query(query)
-		checkError(err)
+		if err != nil {
+			return err
+		}
 
 		var gormStr string
 		var needTimePackage bool
@@ -108,9 +113,11 @@ func genModel(tableNames []string) {
 			)
 
 			err = rows.Scan(&columnName, &dataType, &columnDefault, &isNullable)
-			checkError(err)
+			if err != nil {
+				return err
+			}
 
-			json := genj(columnName, columnDefault, primaryKeys)
+			json := genJSON(columnName, columnDefault, primaryKeys)
 
 			if dataType == "timestamp with time zone" {
 				needTimePackage = true
@@ -118,7 +125,12 @@ func genModel(tableNames []string) {
 
 			// If have to use pointer
 			if dataType == "timestamp with time zone" && isNullable == "YES" {
-				if hasNullRecoreds(tableName, columnName) == true {
+				hasNullRecords, err := hasNullRecords(tableName, columnName)
+				if err != nil {
+					return err
+				}
+
+				if hasNullRecords {
 					dataType = "*time.Time"
 				}
 			}
@@ -130,7 +142,7 @@ func genModel(tableNames []string) {
 
 			// Add belongs_to relation
 			if isInfered == true {
-				json := genj(strings.ToLower(infColName), "", nil)
+				json := genJSON(strings.ToLower(infColName), "", nil)
 				comment := "// This line is infered from column name \"" + columnName + "\"."
 				infColName = gormColName(infColName)
 
@@ -148,16 +160,20 @@ func genModel(tableNames []string) {
 
 		gormStr = "package models\n\n" + importPackage + "type " + gormTableName(tableName) + " struct {\n" + gormStr + "}\n"
 
-		// fmt.Println(gormStr) // Print output
-
 		file, err := os.Create(outDir + inflector.Singularize(tableName) + `.go`)
-		checkError(err)
+		if err != nil {
+			return err
+		}
 		defer file.Close()
 		file.Write(([]byte)(gormStr))
 	}
 
 	err := exec.Command("gofmt", "-w", outDir).Run()
-	checkError(err)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Infer belongs_to Relation from column's name
@@ -189,7 +205,7 @@ func inferORM(s string) (bool, string) {
 }
 
 // Generate json
-func genj(columnName, columnDefault string, primaryKeys map[string]bool) (json string) {
+func genJSON(columnName, columnDefault string, primaryKeys map[string]bool) (json string) {
 	json = "json:\"" + columnName + "\""
 
 	if primaryKeys[columnName] == true {
@@ -205,21 +221,23 @@ func genj(columnName, columnDefault string, primaryKeys map[string]bool) (json s
 	return
 }
 
-func hasNullRecoreds(tableName string, columnName string) bool {
+func hasNullRecords(tableName string, columnName string) (bool, error) {
 	query := `SELECT COUNT(*) FROM ` + tableName + ` WHERE ` + columnName + ` IS NULL;`
 
 	var count string
 
 	err := db.QueryRow(query).Scan(&count)
-	checkError(err)
+	if err != nil {
+		return false, err
+	}
 
 	val, _ := strconv.ParseInt(count, 10, 64)
 
 	if val > 0 {
-		return true
+		return true, nil
 	}
 
-	return false
+	return false, nil
 }
 
 // Singlarlize table name and upper initial character
@@ -266,52 +284,6 @@ func gormDataType(s string) string {
 	}
 }
 
-// not used
-func parseURL(url string) (map[string]string, error) {
-	u, err := nurl.Parse(url)
-	if err != nil {
-		return nil, err
-	}
-
-	if u.Scheme != "postgres" && u.Scheme != "postgresql" {
-		return nil, fmt.Errorf("invalid connection protocol: %s", u.Scheme)
-	}
-
-	kv := map[string]string{}
-	escaper := strings.NewReplacer(` `, `\ `, `'`, `\'`, `\`, `\\`)
-	accrue := func(k, v string) {
-		if v != "" {
-			kv[k] = escaper.Replace(v)
-		}
-	}
-
-	if u.User != nil {
-		v := u.User.Username()
-		accrue("user", v)
-
-		v, _ = u.User.Password()
-		accrue("password", v)
-	}
-
-	if host, port, err := net.SplitHostPort(u.Host); err != nil {
-		accrue("host", u.Host)
-	} else {
-		accrue("host", host)
-		accrue("port", port)
-	}
-
-	if u.Path != "" {
-		accrue("dbname", u.Path[1:])
-	}
-
-	q := u.Query()
-	for k := range q {
-		accrue(k, q.Get(k))
-	}
-
-	return kv, nil
-}
-
 func main() {
 	var url string
 	var dir string
@@ -330,19 +302,30 @@ func main() {
 
 		var err error
 		db, err = sql.Open("postgres", url)
-		checkError(err)
-		defer db.Close()
+		if err != nil {
+      fmt.Fprintln(os.Stderr, err)
+      os.Exit(1)
+    }
 
+		defer db.Close()
 		outDir = dir
 
-		tables := getTableName()
+		tables, err := getTableName()
+		if err != nil {
+      fmt.Fprintln(os.Stderr, err)
+      os.Exit(1)
+    }
 
 		fmt.Println("Generating gorm from tables below...")
 		for _, tableName := range tables {
 			fmt.Printf("Table name: %s\n", tableName)
 		}
 
-		genModel(tables)
+		err = genModel(tables)
+		if err != nil {
+      fmt.Fprintln(os.Stderr, err)
+      os.Exit(1)
+    }
 
 	} else {
 		fmt.Fprintf(os.Stderr, "Usage: Generate gorm model structs from PostgreSQL database schema.\n")

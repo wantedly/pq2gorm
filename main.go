@@ -7,7 +7,6 @@ import (
 	"os"
 
 	_ "github.com/lib/pq"
-	"github.com/wantedly/pq2gorm/pq2g"
 )
 
 func main() {
@@ -50,7 +49,7 @@ func main() {
 	}
 	defer db.Close()
 
-	tables, err := pq2g.GetTableName(db)
+	tables, err := getTableName(db)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -59,7 +58,7 @@ func main() {
 	for _, tableName := range tables {
 		fmt.Printf("Table name: %s\n", tableName)
 
-		if err := pq2g.GenModel(tableName, dir, db); err != nil {
+		if err := genModel(tableName, dir, db); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"flag"
 	"fmt"
 	"net"
 	nurl "net/url"
@@ -10,13 +11,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/codegangsta/cli"
 	"github.com/gedex/inflector"
 	_ "github.com/lib/pq"
 )
 
 var db *sql.DB
-var outDir = "./"
+var outDir string
 
 func checkError(err error) {
 	if err != nil {
@@ -313,67 +313,39 @@ func parseURL(url string) (map[string]string, error) {
 }
 
 func main() {
-	app := cli.NewApp()
-	app.Name = "pq2gorm"
-	app.Usage = "Generate gorm model structs from PostgreSQL database schema"
-	app.Version = "0.0.1"
-
-	// global options
-	app.Flags = []cli.Flag{
-		cli.BoolFlag{
-			Name:  "dry-run, d",
-			Usage: "dry-run",
-		},
+	var url string
+	var dir string
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: Generate gorm model structs from PostgreSQL database schema.\n")
+		flag.PrintDefaults() // Print usage of options
 	}
+	flag.StringVar(&url, "url", "", "Set DB URL")
+	flag.StringVar(&url, "u", "", "Set DB URL")
+	flag.StringVar(&url, "", "", "Set DB URL")
+	flag.StringVar(&dir, "dir", "./", "Set output path")
+	flag.StringVar(&dir, "d", "./", "Set output path")
+	flag.Parse()
 
-	app.Action = func(c *cli.Context) error {
-
-		var paramFirst = ""
-		if len(c.Args()) > 0 {
-
-			if len(c.Args()) == 2 {
-				outDir = c.Args()[1] + "/"
-			}
-
-			if len(c.Args()) > 2 {
-				fmt.Println("Too many arguments are given")
-				return nil
-			}
-
-			var isDry = c.GlobalBool("dry-run")
-
-			if isDry {
-				fmt.Println("this is dry-run")
-			} else {
-				paramFirst = c.Args()[0]
-
-				fmt.Printf("Connecting \"%s\"...\n", paramFirst)
-
-				var err error
-				db, err = sql.Open("postgres", paramFirst)
-				checkError(err)
-				defer db.Close()
-				tables := getTableName()
-
-				fmt.Println("Generating gorm from tables below...")
-				for _, tableName := range tables {
-					fmt.Printf("Table name: %s\n", tableName)
-				}
-
-				genModel(tables)
-			}
+	flag.VisitAll(func(f *flag.Flag) {
+		switch f.Name {
+		case "url":
+			var err error
+			fmt.Printf("Connecting \"%v\"...\n", f.Value)
+			db, err = sql.Open("postgres", fmt.Sprintf("%v", f.Value))
+			checkError(err)
+		case "dir":
+			outDir = fmt.Sprintf("%v/", f.Value)
+		default:
 		}
+	})
 
-		return nil
+	defer db.Close()
+	tables := getTableName()
+
+	fmt.Println("Generating gorm from tables below...")
+	for _, tableName := range tables {
+		fmt.Printf("Table name: %s\n", tableName)
 	}
 
-	app.Before = func(c *cli.Context) error {
-		return nil
-	}
-
-	app.After = func(c *cli.Context) error {
-		return nil
-	}
-
-	app.Run(os.Args)
+	genModel(tables)
 }

@@ -3,19 +3,20 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"github.com/codegangsta/cli"
-	"github.com/gedex/inflector"
-	_ "github.com/lib/pq"
 	"net"
 	nurl "net/url"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/codegangsta/cli"
+	"github.com/gedex/inflector"
+	_ "github.com/lib/pq"
 )
 
-var DB *sql.DB
-var OutDir = "./"
+var db *sql.DB
+var outDir = "./"
 
 func checkError(err error) {
 	if err != nil {
@@ -24,24 +25,24 @@ func checkError(err error) {
 	}
 }
 
-func getTableName() (t_names []string) {
+func getTableName() (tableNames []string) {
 	query := `select relname as TABLE_NAME from pg_stat_user_tables`
 
-	rows, err := DB.Query(query)
+	rows, err := db.Query(query)
 	checkError(err)
 
 	for rows.Next() {
-		var t_name string
-		err = rows.Scan(&t_name)
+		var tableName string
+		err = rows.Scan(&tableName)
 		checkError(err)
 
-		t_names = append(t_names, t_name)
+		tableNames = append(tableNames, tableName)
 	}
 
 	return
 }
 
-func getPrimaryKey(t_name string) (c_names map[string]bool) {
+func getPrimaryKeys(tableName string) (primaryKeys map[string]bool) {
 	query :=
 		`
     select
@@ -50,7 +51,7 @@ func getPrimaryKey(t_name string) (c_names map[string]bool) {
       information_schema.table_constraints tc
       ,information_schema.constraint_column_usage ccu
     where
-      tc.table_name='` + t_name + `'
+      tc.table_name='` + tableName + `'
       and
       tc.constraint_type='PRIMARY KEY'
       and
@@ -63,78 +64,78 @@ func getPrimaryKey(t_name string) (c_names map[string]bool) {
       tc.constraint_name=ccu.constraint_name
     `
 
-	rows, err := DB.Query(query)
+	rows, err := db.Query(query)
 	checkError(err)
 
-	c_names = map[string]bool{}
+	primaryKeys = map[string]bool{}
 	for rows.Next() {
-		var c_name string
-		err = rows.Scan(&c_name)
+		var columnName string
+		err = rows.Scan(&columnName)
 		checkError(err)
 
-		c_names[c_name] = true
+		primaryKeys[columnName] = true
 	}
 
 	return
 }
 
-func genModel(t_names []string) {
-	for _, t_name := range t_names {
+func genModel(tableNames []string) {
+	for _, tableName := range tableNames {
 
-		primary_key := getPrimaryKey(t_name)
+		primaryKeys := getPrimaryKeys(tableName)
 
 		query :=
 			`
       select column_name, data_type, COALESCE(column_default, '') as column_default, is_nullable
       from information_schema.columns
       where
-        table_name='` + t_name + `'
+        table_name='` + tableName + `'
       order by
         ordinal_position;
       `
 
-		rows, err := DB.Query(query)
+		rows, err := db.Query(query)
 		checkError(err)
 
-		var model_str string
+		var gormStr string
 		var needTimePackage bool
 		for rows.Next() {
 			var (
-				column_name    string
-				data_type      string
-				column_default string
-				is_nullable    string
+				columnName    string
+				dataType      string
+				columnDefault string
+				isNullable    string
 			)
 
-			err = rows.Scan(&column_name, &data_type, &column_default, &is_nullable)
+			err = rows.Scan(&columnName, &dataType, &columnDefault, &isNullable)
 			checkError(err)
 
-			json := genj(column_name, column_default, primary_key)
+			json := genj(columnName, columnDefault, primaryKeys)
 
-			if data_type == "timestamp with time zone" {
+			if dataType == "timestamp with time zone" {
 				needTimePackage = true
 			}
 
 			// If have to use pointer
-			if data_type == "timestamp with time zone" && is_nullable == "YES" {
-				if hasNullRecoreds(t_name, column_name) == true {
-					data_type = "*time.Time"
+			if dataType == "timestamp with time zone" && isNullable == "YES" {
+				if hasNullRecoreds(tableName, columnName) == true {
+					dataType = "*time.Time"
 				}
 			}
 
-			m := gormColName(column_name) + " " + gormDataType(data_type) + " `" + json + "`\n"
-			model_str += m
+			m := gormColName(columnName) + " " + gormDataType(dataType) + " `" + json + "`\n"
+			gormStr += m
 
-			isInfered, inf_column_name := inferORM(column_name)
+			isInfered, infColName := inferORM(columnName)
 
 			// Add belongs_to relation
 			if isInfered == true {
-				json := genj(strings.ToLower(inf_column_name), "", nil)
-				comment := "// This line is infered from column name \"" + column_name + "\"."
-				inf_column_name = gormColName(inf_column_name)
+				json := genj(strings.ToLower(infColName), "", nil)
+				comment := "// This line is infered from column name \"" + columnName + "\"."
+				infColName = gormColName(infColName)
 
-				m := inf_column_name + " *" + inf_column_name + " `" + json + "` " + comment + "\n"
-				model_str += m
+				m := infColName + " *" + infColName + " `" + json + "` " + comment + "\n"
+				gormStr += m
 			}
 		}
 
@@ -145,17 +146,17 @@ func genModel(t_names []string) {
 			importPackage = ""
 		}
 
-		model_str = "package models\n\n" + importPackage + "type " + gormTableName(t_name) + " struct {\n" + model_str + "}\n"
+		gormStr = "package models\n\n" + importPackage + "type " + gormTableName(tableName) + " struct {\n" + gormStr + "}\n"
 
-		// fmt.Println(model_str) // Print output
+		// fmt.Println(gormStr) // Print output
 
-		file, err := os.Create(OutDir + inflector.Singularize(t_name) + `.go`)
+		file, err := os.Create(outDir + inflector.Singularize(tableName) + `.go`)
 		checkError(err)
 		defer file.Close()
-		file.Write(([]byte)(model_str))
+		file.Write(([]byte)(gormStr))
 	}
 
-	err := exec.Command("gofmt", "-w", OutDir).Run()
+	err := exec.Command("gofmt", "-w", outDir).Run()
 	checkError(err)
 }
 
@@ -168,7 +169,7 @@ func inferORM(s string) (bool, string) {
 		id = "id"
 	)
 
-	var new_ss []string
+	var newSS []string
 	var containsID bool = false
 	for _, word := range ss {
 		if word == id {
@@ -176,40 +177,40 @@ func inferORM(s string) (bool, string) {
 			continue
 		}
 
-		new_ss = append(new_ss, word)
+		newSS = append(newSS, word)
 	}
 
-	if containsID == false || len(new_ss) == 0 {
+	if containsID == false || len(newSS) == 0 {
 		return false, ""
 	}
 
-	inf_column_name := strings.Join(new_ss, "_")
-	return true, inf_column_name
+	infColName := strings.Join(newSS, "_")
+	return true, infColName
 }
 
 // Generate json
-func genj(column_name, column_default string, primary_key map[string]bool) (json string) {
-	json = "json:\"" + column_name + "\""
+func genj(columnName, columnDefault string, primaryKeys map[string]bool) (json string) {
+	json = "json:\"" + columnName + "\""
 
-	if primary_key[column_name] == true {
+	if primaryKeys[columnName] == true {
 		p := "gorm:\"primary_key;AUTO_INCREMENT\" "
 		json = p + json
 	}
 
-	if column_default != "" && !strings.Contains(column_default, "nextval") {
-		d := " sql:\"DEFAULT:" + column_default + "\""
+	if columnDefault != "" && !strings.Contains(columnDefault, "nextval") {
+		d := " sql:\"DEFAULT:" + columnDefault + "\""
 		json += d
 	}
 
 	return
 }
 
-func hasNullRecoreds(table_name string, column_name string) bool {
-	query := `SELECT COUNT(*) FROM ` + table_name + ` WHERE ` + column_name + ` IS NULL;`
+func hasNullRecoreds(tableName string, columnName string) bool {
+	query := `SELECT COUNT(*) FROM ` + tableName + ` WHERE ` + columnName + ` IS NULL;`
 
 	var count string
 
-	err := DB.QueryRow(query).Scan(&count)
+	err := db.QueryRow(query).Scan(&count)
 	checkError(err)
 
 	val, _ := strconv.ParseInt(count, 10, 64)
@@ -331,7 +332,7 @@ func main() {
 		if len(c.Args()) > 0 {
 
 			if len(c.Args()) == 2 {
-				OutDir = c.Args()[1] + "/"
+				outDir = c.Args()[1] + "/"
 			}
 
 			if len(c.Args()) > 2 {
@@ -348,15 +349,15 @@ func main() {
 
 				fmt.Printf("Connecting \"%s\"...\n", paramFirst)
 
-				db, err := sql.Open("postgres", paramFirst)
-				DB = db
+				var err error
+				db, err = sql.Open("postgres", paramFirst)
 				checkError(err)
-				defer DB.Close()
+				defer db.Close()
 				tables := getTableName()
 
 				fmt.Println("Generating gorm from tables below...")
-				for _, table_name := range tables {
-					fmt.Printf("Table name: %s\n", table_name)
+				for _, tableName := range tables {
+					fmt.Printf("Table name: %s\n", tableName)
 				}
 
 				genModel(tables)

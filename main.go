@@ -304,6 +304,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := os.MkdirAll(dir, 0777); err != nil {
+    fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+  }
+
 	fmt.Printf("Connecting to database...\n")
 
 	db, err := sql.Open("postgres", pgURL)

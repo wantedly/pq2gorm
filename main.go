@@ -13,10 +13,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
-var db *sql.DB
-var outDir string
-
-func getTableName() ([]string, error) {
+func getTableName(db *sql.DB) ([]string, error) {
 	query := `select relname as TABLE_NAME from pg_stat_user_tables`
 
 	rows, err := db.Query(query)
@@ -38,7 +35,7 @@ func getTableName() ([]string, error) {
 	return tableNames, nil
 }
 
-func getPrimaryKeys(tableName string) (map[string]bool, error) {
+func getPrimaryKeys(tableName string, db *sql.DB) (map[string]bool, error) {
 	query :=
 		`
     select
@@ -79,10 +76,10 @@ func getPrimaryKeys(tableName string) (map[string]bool, error) {
 	return primaryKeys, nil
 }
 
-func genModel(tableNames []string) error {
+func genModel(tableNames []string, outPath string, db *sql.DB) error {
 	for _, tableName := range tableNames {
 
-		primaryKeys, err := getPrimaryKeys(tableName)
+		primaryKeys, err := getPrimaryKeys(tableName, db)
 		if err != nil {
 			return err
 		}
@@ -125,7 +122,7 @@ func genModel(tableNames []string) error {
 
 			// If have to use pointer
 			if dataType == "timestamp with time zone" && isNullable == "YES" {
-				hasNullRecords, err := hasNullRecords(tableName, columnName)
+				hasNullRecords, err := hasNullRecords(tableName, columnName, db)
 				if err != nil {
 					return err
 				}
@@ -160,7 +157,7 @@ func genModel(tableNames []string) error {
 
 		gormStr = "package models\n\n" + importPackage + "type " + gormTableName(tableName) + " struct {\n" + gormStr + "}\n"
 
-		file, err := os.Create(outDir + inflector.Singularize(tableName) + `.go`)
+		file, err := os.Create(outPath + inflector.Singularize(tableName) + `.go`)
 		if err != nil {
 			return err
 		}
@@ -168,7 +165,7 @@ func genModel(tableNames []string) error {
 		file.Write(([]byte)(gormStr))
 	}
 
-	err := exec.Command("gofmt", "-w", outDir).Run()
+	err := exec.Command("gofmt", "-w", outPath).Run()
 	if err != nil {
 		return err
 	}
@@ -221,7 +218,7 @@ func genJSON(columnName, columnDefault string, primaryKeys map[string]bool) (jso
 	return
 }
 
-func hasNullRecords(tableName string, columnName string) (bool, error) {
+func hasNullRecords(tableName string, columnName string, db *sql.DB) (bool, error) {
 	query := `SELECT COUNT(*) FROM ` + tableName + ` WHERE ` + columnName + ` IS NULL;`
 
 	var count string
@@ -300,32 +297,29 @@ func main() {
 	if url != "" {
 		fmt.Printf("Connecting to database...\n")
 
-		var err error
-		db, err = sql.Open("postgres", url)
+		db, err := sql.Open("postgres", url)
 		if err != nil {
-      fmt.Fprintln(os.Stderr, err)
-      os.Exit(1)
-    }
-
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 		defer db.Close()
-		outDir = dir
 
-		tables, err := getTableName()
+		tables, err := getTableName(db)
 		if err != nil {
-      fmt.Fprintln(os.Stderr, err)
-      os.Exit(1)
-    }
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 
 		fmt.Println("Generating gorm from tables below...")
 		for _, tableName := range tables {
 			fmt.Printf("Table name: %s\n", tableName)
 		}
 
-		err = genModel(tables)
+		err = genModel(tables, dir+"/", db)
 		if err != nil {
-      fmt.Fprintln(os.Stderr, err)
-      os.Exit(1)
-    }
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 
 	} else {
 		fmt.Fprintf(os.Stderr, "Usage: Generate gorm model structs from PostgreSQL database schema.\n")

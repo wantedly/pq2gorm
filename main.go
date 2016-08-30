@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"go/format"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 
@@ -138,7 +138,7 @@ func genModel(tableNames []string, outPath string, db *sql.DB) error {
 			isInfered, infColName := inferORM(columnName)
 
 			// Add belongs_to relation
-			if isInfered == true {
+			if isInfered {
 				json := genJSON(strings.ToLower(infColName), "", nil)
 				comment := "// This line is infered from column name \"" + columnName + "\"."
 				infColName = gormColName(infColName)
@@ -162,12 +162,13 @@ func genModel(tableNames []string, outPath string, db *sql.DB) error {
 			return err
 		}
 		defer file.Close()
-		file.Write(([]byte)(gormStr))
-	}
 
-	err := exec.Command("gofmt", "-w", outPath).Run()
-	if err != nil {
-		return err
+		src, err := format.Source(([]byte)(gormStr))
+    if err != nil {
+        return err
+    }
+
+		file.Write(src)
 	}
 
 	return nil
@@ -178,14 +179,10 @@ func inferORM(s string) (bool, string) {
 	s = strings.ToLower(s)
 	ss := strings.Split(s, "_")
 
-	const (
-		id = "id"
-	)
-
 	newSS := []string{}
 	var containsID bool = false
 	for _, word := range ss {
-		if word == id {
+		if word == "id" {
 			containsID = true
 			continue
 		}
@@ -205,7 +202,7 @@ func inferORM(s string) (bool, string) {
 func genJSON(columnName, columnDefault string, primaryKeys map[string]bool) (json string) {
 	json = "json:\"" + columnName + "\""
 
-	if primaryKeys[columnName] == true {
+	if primaryKeys[columnName] {
 		p := "gorm:\"primary_key;AUTO_INCREMENT\" "
 		json = p + json
 	}
@@ -248,17 +245,16 @@ func gormTableName(s string) string {
 func gormColName(s string) string {
 	s = strings.ToLower(s)
 	ss := strings.Split(s, "_")
-	const (
-		id  = "id"
-		url = "url"
-	)
+
 	for i, word := range ss {
-		if strings.Contains(word, id) {
-			word = strings.Replace(word, id, "ID", -1)
+		if strings.Contains(word, "id") {
+			word = strings.Replace(word, "id", "ID", -1)
 		}
-		if strings.Contains(word, url) {
-			word = strings.Replace(word, url, "URL", -1)
+
+		if strings.Contains(word, "url") {
+			word = strings.Replace(word, "url", "URL", -1)
 		}
+
 		ss[i] = strings.Title(word)
 	}
 	return strings.Join(ss, "")
@@ -294,36 +290,35 @@ func main() {
 	flag.StringVar(&dir, "d", "./", "Set output path")
 	flag.Parse()
 
-	if url != "" {
-		fmt.Printf("Connecting to database...\n")
-
-		db, err := sql.Open("postgres", url)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		defer db.Close()
-
-		tables, err := getTableName(db)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-
-		fmt.Println("Generating gorm from tables below...")
-		for _, tableName := range tables {
-			fmt.Printf("Table name: %s\n", tableName)
-		}
-
-		err = genModel(tables, dir+"/", db)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-
-	} else {
+	if url == "" {
 		fmt.Fprintf(os.Stderr, "Usage: Generate gorm model structs from PostgreSQL database schema.\n")
 		flag.PrintDefaults() // Print usage of options
+		os.Exit(1)
+	}
+
+	fmt.Printf("Connecting to database...\n")
+
+	db, err := sql.Open("postgres", url)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	tables, err := getTableName(db)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Generating gorm from tables below...")
+	for _, tableName := range tables {
+		fmt.Printf("Table name: %s\n", tableName)
+	}
+
+	err = genModel(tables, dir+"/", db)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }

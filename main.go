@@ -169,7 +169,7 @@ func inferORM(s string) (bool, string) {
 		id = "id"
 	)
 
-	var newSS []string
+	newSS := []string{}
 	var containsID bool = false
 	for _, word := range ss {
 		if word == id {

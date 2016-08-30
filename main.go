@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/wantedly/pq2gorm/pq2g"
 	_ "github.com/lib/pq"
+	"github.com/wantedly/pq2gorm/pq2g"
 )
 
 func main() {
@@ -37,9 +37,9 @@ func main() {
 	}
 
 	if err := os.MkdirAll(dir, 0777); err != nil {
-    fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
-  }
+	}
 
 	fmt.Printf("Connecting to database...\n")
 

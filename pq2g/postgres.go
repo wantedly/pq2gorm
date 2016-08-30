@@ -1,47 +1,47 @@
 package pq2g
 
 import (
-  "database/sql"
-  "go/format"
-  "os"
-  "path/filepath"
-  "strconv"
-  "strings"
+	"database/sql"
+	"go/format"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 
-  "github.com/gedex/inflector"
-  _ "github.com/lib/pq"
+	"github.com/gedex/inflector"
+	_ "github.com/lib/pq"
 )
 
 func GetTableName(db *sql.DB) ([]string, error) {
-  query := `select relname as TABLE_NAME from pg_stat_user_tables`
+	query := `select relname as TABLE_NAME from pg_stat_user_tables`
 
-  rows, err := db.Query(query)
-  if err != nil {
-    return nil, err
-  }
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
 
-  tableNames := []string{}
-  for rows.Next() {
-    var tableName string
-    err = rows.Scan(&tableName)
-    if err != nil {
-      return nil, err
-    }
+	tableNames := []string{}
+	for rows.Next() {
+		var tableName string
+		err = rows.Scan(&tableName)
+		if err != nil {
+			return nil, err
+		}
 
-    tableNames = append(tableNames, tableName)
-  }
+		tableNames = append(tableNames, tableName)
+	}
 
-  return tableNames, nil
+	return tableNames, nil
 }
 
 func GenModel(tableName string, outPath string, db *sql.DB) error {
-  primaryKeys, err := getPrimaryKeys(tableName, db)
-  if err != nil {
-    return err
-  }
+	primaryKeys, err := getPrimaryKeys(tableName, db)
+	if err != nil {
+		return err
+	}
 
-  query :=
-    `
+	query :=
+		`
     select column_name, data_type, COALESCE(column_default, '') as column_default, is_nullable
     from information_schema.columns
     where
@@ -50,91 +50,91 @@ func GenModel(tableName string, outPath string, db *sql.DB) error {
       ordinal_position;
     `
 
-  rows, err := db.Query(query)
-  if err != nil {
-    return err
-  }
+	rows, err := db.Query(query)
+	if err != nil {
+		return err
+	}
 
-  var gormStr string
-  var needTimePackage bool
-  for rows.Next() {
-    var (
-      columnName    string
-      dataType      string
-      columnDefault string
-      isNullable    string
-    )
+	var gormStr string
+	var needTimePackage bool
+	for rows.Next() {
+		var (
+			columnName    string
+			dataType      string
+			columnDefault string
+			isNullable    string
+		)
 
-    err = rows.Scan(&columnName, &dataType, &columnDefault, &isNullable)
-    if err != nil {
-      return err
-    }
+		err = rows.Scan(&columnName, &dataType, &columnDefault, &isNullable)
+		if err != nil {
+			return err
+		}
 
-    json := genJSON(columnName, columnDefault, primaryKeys)
+		json := genJSON(columnName, columnDefault, primaryKeys)
 
-    if dataType == "timestamp with time zone" {
-      needTimePackage = true
-    }
+		if dataType == "timestamp with time zone" {
+			needTimePackage = true
+		}
 
-    // If have to use pointer
-    if dataType == "timestamp with time zone" && isNullable == "YES" {
-      hasNullRecords, err := hasNullRecords(tableName, columnName, db)
-      if err != nil {
-        return err
-      }
+		// If have to use pointer
+		if dataType == "timestamp with time zone" && isNullable == "YES" {
+			hasNullRecords, err := hasNullRecords(tableName, columnName, db)
+			if err != nil {
+				return err
+			}
 
-      if hasNullRecords {
-        dataType = "*time.Time"
-      }
-    }
+			if hasNullRecords {
+				dataType = "*time.Time"
+			}
+		}
 
-    m := gormColName(columnName) + " " + gormDataType(dataType) + " `" + json + "`\n"
-    gormStr += m
+		m := gormColName(columnName) + " " + gormDataType(dataType) + " `" + json + "`\n"
+		gormStr += m
 
-    isInfered, infColName := inferORM(columnName)
+		isInfered, infColName := inferORM(columnName)
 
-    // Add belongs_to relation
-    if isInfered {
-      json := genJSON(strings.ToLower(infColName), "", nil)
-      comment := "// This line is infered from column name \"" + columnName + "\"."
-      infColName = gormColName(infColName)
+		// Add belongs_to relation
+		if isInfered {
+			json := genJSON(strings.ToLower(infColName), "", nil)
+			comment := "// This line is infered from column name \"" + columnName + "\"."
+			infColName = gormColName(infColName)
 
-      m := infColName + " *" + infColName + " `" + json + "` " + comment + "\n"
-      gormStr += m
-    }
-  }
+			m := infColName + " *" + infColName + " `" + json + "` " + comment + "\n"
+			gormStr += m
+		}
+	}
 
-  var importPackage string
-  if needTimePackage {
-    importPackage = "import \"time\"\n\n"
-  } else {
-    importPackage = ""
-  }
+	var importPackage string
+	if needTimePackage {
+		importPackage = "import \"time\"\n\n"
+	} else {
+		importPackage = ""
+	}
 
-  gormStr = "package models\n\n" + importPackage + "type " + gormTableName(tableName) + " struct {\n" + gormStr + "}\n"
+	gormStr = "package models\n\n" + importPackage + "type " + gormTableName(tableName) + " struct {\n" + gormStr + "}\n"
 
-  modelFile := filepath.Join(outPath, inflector.Singularize(tableName)+".go")
-  file, err := os.Create(modelFile)
+	modelFile := filepath.Join(outPath, inflector.Singularize(tableName)+".go")
+	file, err := os.Create(modelFile)
 
-  if err != nil {
-    return err
-  }
+	if err != nil {
+		return err
+	}
 
-  defer file.Close()
+	defer file.Close()
 
-  src, err := format.Source(([]byte)(gormStr))
-  if err != nil {
-    return err
-  }
+	src, err := format.Source(([]byte)(gormStr))
+	if err != nil {
+		return err
+	}
 
-  file.Write(src)
+	file.Write(src)
 
-  return nil
+	return nil
 }
 
 func getPrimaryKeys(tableName string, db *sql.DB) (map[string]bool, error) {
-  query :=
-    `
+	query :=
+		`
     select
     ccu.column_name as COLUMN_NAME
     from
@@ -154,40 +154,40 @@ func getPrimaryKeys(tableName string, db *sql.DB) (map[string]bool, error) {
       tc.constraint_name=ccu.constraint_name
     `
 
-  rows, err := db.Query(query)
-  if err != nil {
-    return nil, err
-  }
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
 
-  primaryKeys := map[string]bool{}
-  for rows.Next() {
-    var columnName string
-    err = rows.Scan(&columnName)
-    if err != nil {
-      return nil, err
-    }
+	primaryKeys := map[string]bool{}
+	for rows.Next() {
+		var columnName string
+		err = rows.Scan(&columnName)
+		if err != nil {
+			return nil, err
+		}
 
-    primaryKeys[columnName] = true
-  }
+		primaryKeys[columnName] = true
+	}
 
-  return primaryKeys, nil
+	return primaryKeys, nil
 }
 
 func hasNullRecords(tableName string, columnName string, db *sql.DB) (bool, error) {
-  query := `SELECT COUNT(*) FROM ` + tableName + ` WHERE ` + columnName + ` IS NULL;`
+	query := `SELECT COUNT(*) FROM ` + tableName + ` WHERE ` + columnName + ` IS NULL;`
 
-  var count string
+	var count string
 
-  err := db.QueryRow(query).Scan(&count)
-  if err != nil {
-    return false, err
-  }
+	err := db.QueryRow(query).Scan(&count)
+	if err != nil {
+		return false, err
+	}
 
-  val, _ := strconv.ParseInt(count, 10, 64)
+	val, _ := strconv.ParseInt(count, 10, 64)
 
-  if val > 0 {
-    return true, nil
-  }
+	if val > 0 {
+		return true, nil
+	}
 
-  return false, nil
+	return false, nil
 }

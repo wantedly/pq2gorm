@@ -164,9 +164,9 @@ func genModel(tableNames []string, outPath string, db *sql.DB) error {
 		defer file.Close()
 
 		src, err := format.Source(([]byte)(gormStr))
-    if err != nil {
-        return err
-    }
+		if err != nil {
+			return err
+		}
 
 		file.Write(src)
 	}

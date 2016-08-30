@@ -321,31 +321,38 @@ func main() {
 	}
 	flag.StringVar(&url, "url", "", "Set DB URL")
 	flag.StringVar(&url, "u", "", "Set DB URL")
-	flag.StringVar(&url, "", "", "Set DB URL")
 	flag.StringVar(&dir, "dir", "./", "Set output path")
 	flag.StringVar(&dir, "d", "./", "Set output path")
 	flag.Parse()
 
-	flag.VisitAll(func(f *flag.Flag) {
-		switch f.Name {
-		case "url":
-			var err error
-			fmt.Printf("Connecting \"%v\"...\n", f.Value)
-			db, err = sql.Open("postgres", fmt.Sprintf("%v", f.Value))
-			checkError(err)
-		case "dir":
-			outDir = fmt.Sprintf("%v/", f.Value)
-		default:
+	if url != "" {
+
+		flag.VisitAll(func(f *flag.Flag) {
+			switch f.Name {
+			case "url":
+				var err error
+				fmt.Printf("Connecting \"%v\"...\n", f.Value)
+				db, err = sql.Open("postgres", fmt.Sprintf("%v", f.Value))
+				checkError(err)
+			case "dir":
+				outDir = fmt.Sprintf("%v/", f.Value)
+			default:
+			}
+		})
+
+		defer db.Close()
+		tables := getTableName()
+
+		fmt.Println("Generating gorm from tables below...")
+		for _, tableName := range tables {
+			fmt.Printf("Table name: %s\n", tableName)
 		}
-	})
 
-	defer db.Close()
-	tables := getTableName()
+		genModel(tables)
 
-	fmt.Println("Generating gorm from tables below...")
-	for _, tableName := range tables {
-		fmt.Printf("Table name: %s\n", tableName)
+	} else {
+		fmt.Fprintf(os.Stderr, "Usage: Generate gorm model structs from PostgreSQL database schema.\n")
+		flag.PrintDefaults() // Print usage of options
+		os.Exit(1)
 	}
-
-	genModel(tables)
 }

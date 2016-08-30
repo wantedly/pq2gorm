@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go/format"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -157,10 +158,13 @@ func genModel(tableNames []string, outPath string, db *sql.DB) error {
 
 		gormStr = "package models\n\n" + importPackage + "type " + gormTableName(tableName) + " struct {\n" + gormStr + "}\n"
 
-		file, err := os.Create(outPath + inflector.Singularize(tableName) + `.go`)
+		modelFile := filepath.Join(outPath, inflector.Singularize(tableName)+".go")
+		file, err := os.Create(modelFile)
+
 		if err != nil {
 			return err
 		}
+
 		defer file.Close()
 
 		src, err := format.Source(([]byte)(gormStr))
@@ -278,27 +282,34 @@ func gormDataType(s string) string {
 }
 
 func main() {
-	var url string
 	var dir string
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: Generate gorm model structs from PostgreSQL database schema.\n")
-		flag.PrintDefaults() // Print usage of options
-	}
-	flag.StringVar(&url, "url", "", "Set DB URL")
-	flag.StringVar(&url, "u", "", "Set DB URL")
-	flag.StringVar(&dir, "dir", "./", "Set output path")
-	flag.StringVar(&dir, "d", "./", "Set output path")
-	flag.Parse()
 
-	if url == "" {
+	f := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+
+	f.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: Generate gorm model structs from PostgreSQL database schema.\n")
-		flag.PrintDefaults() // Print usage of options
+		f.PrintDefaults() // Print usage of options
+	}
+	f.StringVar(&dir, "dir", "./", "Set output path")
+	f.StringVar(&dir, "d", "./", "Set output path")
+
+	f.Parse(os.Args[1:])
+
+	var pgURL string
+
+	for 0 < f.NArg() {
+		pgURL = f.Args()[0]
+		f.Parse(f.Args()[1:])
+	}
+
+	if pgURL == "" {
+		f.Usage()
 		os.Exit(1)
 	}
 
 	fmt.Printf("Connecting to database...\n")
 
-	db, err := sql.Open("postgres", url)
+	db, err := sql.Open("postgres", pgURL)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -316,7 +327,7 @@ func main() {
 		fmt.Printf("Table name: %s\n", tableName)
 	}
 
-	err = genModel(tables, dir+"/", db)
+	err = genModel(tables, dir, db)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

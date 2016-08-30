@@ -77,103 +77,100 @@ func getPrimaryKeys(tableName string, db *sql.DB) (map[string]bool, error) {
 	return primaryKeys, nil
 }
 
-func genModel(tableNames []string, outPath string, db *sql.DB) error {
-	for _, tableName := range tableNames {
+func genModel(tableName string, outPath string, db *sql.DB) error {
+	primaryKeys, err := getPrimaryKeys(tableName, db)
+	if err != nil {
+		return err
+	}
 
-		primaryKeys, err := getPrimaryKeys(tableName, db)
+	query :=
+		`
+    select column_name, data_type, COALESCE(column_default, '') as column_default, is_nullable
+    from information_schema.columns
+    where
+      table_name='` + tableName + `'
+    order by
+      ordinal_position;
+    `
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return err
+	}
+
+	var gormStr string
+	var needTimePackage bool
+	for rows.Next() {
+		var (
+			columnName    string
+			dataType      string
+			columnDefault string
+			isNullable    string
+		)
+
+		err = rows.Scan(&columnName, &dataType, &columnDefault, &isNullable)
 		if err != nil {
 			return err
 		}
 
-		query :=
-			`
-      select column_name, data_type, COALESCE(column_default, '') as column_default, is_nullable
-      from information_schema.columns
-      where
-        table_name='` + tableName + `'
-      order by
-        ordinal_position;
-      `
+		json := genJSON(columnName, columnDefault, primaryKeys)
 
-		rows, err := db.Query(query)
-		if err != nil {
-			return err
+		if dataType == "timestamp with time zone" {
+			needTimePackage = true
 		}
 
-		var gormStr string
-		var needTimePackage bool
-		for rows.Next() {
-			var (
-				columnName    string
-				dataType      string
-				columnDefault string
-				isNullable    string
-			)
-
-			err = rows.Scan(&columnName, &dataType, &columnDefault, &isNullable)
+		// If have to use pointer
+		if dataType == "timestamp with time zone" && isNullable == "YES" {
+			hasNullRecords, err := hasNullRecords(tableName, columnName, db)
 			if err != nil {
 				return err
 			}
 
-			json := genJSON(columnName, columnDefault, primaryKeys)
-
-			if dataType == "timestamp with time zone" {
-				needTimePackage = true
+			if hasNullRecords {
+				dataType = "*time.Time"
 			}
+		}
 
-			// If have to use pointer
-			if dataType == "timestamp with time zone" && isNullable == "YES" {
-				hasNullRecords, err := hasNullRecords(tableName, columnName, db)
-				if err != nil {
-					return err
-				}
+		m := gormColName(columnName) + " " + gormDataType(dataType) + " `" + json + "`\n"
+		gormStr += m
 
-				if hasNullRecords {
-					dataType = "*time.Time"
-				}
-			}
+		isInfered, infColName := inferORM(columnName)
 
-			m := gormColName(columnName) + " " + gormDataType(dataType) + " `" + json + "`\n"
+		// Add belongs_to relation
+		if isInfered {
+			json := genJSON(strings.ToLower(infColName), "", nil)
+			comment := "// This line is infered from column name \"" + columnName + "\"."
+			infColName = gormColName(infColName)
+
+			m := infColName + " *" + infColName + " `" + json + "` " + comment + "\n"
 			gormStr += m
-
-			isInfered, infColName := inferORM(columnName)
-
-			// Add belongs_to relation
-			if isInfered {
-				json := genJSON(strings.ToLower(infColName), "", nil)
-				comment := "// This line is infered from column name \"" + columnName + "\"."
-				infColName = gormColName(infColName)
-
-				m := infColName + " *" + infColName + " `" + json + "` " + comment + "\n"
-				gormStr += m
-			}
 		}
-
-		var importPackage string
-		if needTimePackage {
-			importPackage = "import \"time\"\n\n"
-		} else {
-			importPackage = ""
-		}
-
-		gormStr = "package models\n\n" + importPackage + "type " + gormTableName(tableName) + " struct {\n" + gormStr + "}\n"
-
-		modelFile := filepath.Join(outPath, inflector.Singularize(tableName)+".go")
-		file, err := os.Create(modelFile)
-
-		if err != nil {
-			return err
-		}
-
-		defer file.Close()
-
-		src, err := format.Source(([]byte)(gormStr))
-		if err != nil {
-			return err
-		}
-
-		file.Write(src)
 	}
+
+	var importPackage string
+	if needTimePackage {
+		importPackage = "import \"time\"\n\n"
+	} else {
+		importPackage = ""
+	}
+
+	gormStr = "package models\n\n" + importPackage + "type " + gormTableName(tableName) + " struct {\n" + gormStr + "}\n"
+
+	modelFile := filepath.Join(outPath, inflector.Singularize(tableName)+".go")
+	file, err := os.Create(modelFile)
+
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
+
+	src, err := format.Source(([]byte)(gormStr))
+	if err != nil {
+		return err
+	}
+
+	file.Write(src)
 
 	return nil
 }
@@ -322,14 +319,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("Generating gorm from tables below...")
 	for _, tableName := range tables {
 		fmt.Printf("Table name: %s\n", tableName)
-	}
 
-	err = genModel(tables, dir, db)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		if err := genModel(tableName, dir, db); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	}
 }

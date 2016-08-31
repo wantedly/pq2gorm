@@ -3,7 +3,7 @@
 pq2gorm is a generator of [gorm](https://github.com/jinzhu/gorm) model structs from a PostgresSQL database.
 
 * Input: Connection URI of a PostgresSQL database.
-* Output: Model definitions based on [gorm](https://github.com/jinzhu/gorm) annotated struct
+* Output: Model definitions based on [gorm](https://github.com/jinzhu/gorm) annotated struct.
 
 ## How to build and install
 
@@ -44,7 +44,7 @@ Example 2: Generate gorm model files in `./out` directory.
 pq2gorm "postgresql://user:password@host:port/dbname?sslmode=disable" -d ./out
 ```
 
-If the directory `./out` does not exist when you run, `pq2gorm` will create `./out` directory with output files.
+If the directory `./out` does not exist, `pq2gorm` create `./out` directory with output files.
 
 
 ## License

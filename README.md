@@ -27,7 +27,7 @@ Connection URI is necessary for running.
 
 ### Usage:
 
-```
+```bash
 $ pq2gorm                                                                                                                                   
 Usage: Generate gorm model structs from PostgreSQL database schema.
   -d string
@@ -38,8 +38,8 @@ Usage: Generate gorm model structs from PostgreSQL database schema.
 
 **Example 1:** Generate gorm model files in current directory.
 
-```
-pq2gorm "postgresql://user:password@host:port/dbname?sslmode=disable"
+```bash
+$ pq2gorm "postgresql://user:password@host:port/dbname?sslmode=disable"
 ```
 
 For an example, user model user.go as shown below will be generated:
@@ -53,8 +53,8 @@ type User struct {
 
 **Example 2:** Generate gorm model files in `./out` directory.
 
-```
-pq2gorm "postgresql://user:password@host:port/dbname?sslmode=disable" -d ./out
+```bash
+$ pq2gorm "postgresql://user:password@host:port/dbname?sslmode=disable" -d ./out
 ```
 
 If the directory `./out` does not exist, `pq2gorm` creates `./out` directory with output files.

@@ -21,10 +21,12 @@ $ go build
 `go build` generates a binary file `pq2gorm`.
 
 ## How to use
+
 Run `pq2gorm` with Connection URI of a PostgresSQL database.
 Connection URI is necessary for running.
 
 ### Usage:
+
 ```
 $ pq2gorm                                                                                                                                   
 Usage: Generate gorm model structs from PostgreSQL database schema.
@@ -34,18 +36,28 @@ Usage: Generate gorm model structs from PostgreSQL database schema.
     	Set output path (default "./")
 ```
 
-Example 1: Generate gorm model files in current directory.
+**Example 1:** Generate gorm model files in current directory.
+
 ```
 pq2gorm "postgresql://user:password@host:port/dbname?sslmode=disable"
 ```
 
-Example 2: Generate gorm model files in `./out` directory.
+For an example, user model user.go as shown below will be generated:
+
+```go
+type User struct {
+    ID uint `json:"id"`
+    ...
+}
+```
+
+**Example 2:** Generate gorm model files in `./out` directory.
+
 ```
 pq2gorm "postgresql://user:password@host:port/dbname?sslmode=disable" -d ./out
 ```
 
 If the directory `./out` does not exist, `pq2gorm` creates `./out` directory with output files.
-
 
 ## License
 [![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)

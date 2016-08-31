@@ -42,7 +42,7 @@ Usage: Generate gorm model structs from PostgreSQL database schema.
 $ pq2gorm "postgresql://user:password@host:port/dbname?sslmode=disable"
 ```
 
-For an example, user model user.go as shown below will be generated:
+For example, user model user.go as shown below will be generated:
 
 ```go
 type User struct {

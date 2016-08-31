@@ -18,7 +18,7 @@ $ cd $GOPATH/src/github.com/wantedly/pq2gorm
 $ go build
 ```
 
-`go build` generates binary `pq2gorm`.
+`go build` generates a binary file `pq2gorm`.
 
 ## How to use
 Run `pq2gorm` with Connection URI of a PostgresSQL database.
@@ -44,7 +44,7 @@ Example 2: Generate gorm model files in `./out` directory.
 pq2gorm "postgresql://user:password@host:port/dbname?sslmode=disable" -d ./out
 ```
 
-If the directory `./out` does not exist, `pq2gorm` create `./out` directory with output files.
+If the directory `./out` does not exist, `pq2gorm` creates `./out` directory with output files.
 
 
 ## License

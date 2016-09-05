@@ -60,3 +60,5 @@ Temporary Items
 .apdisk
 
 /vendor
+/bin
+/pq2gorm

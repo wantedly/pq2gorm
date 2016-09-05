@@ -27,10 +27,10 @@ $ make install
 Run `pq2gorm` with Connection URI of a PostgresSQL database.
 Connection URI is necessary for running.
 
-### Usage:
+### Usage
 
 ```bash
-$ pq2gorm                                                                                                                                   
+$ pq2gorm
 Usage: Generate gorm model structs from PostgreSQL database schema.
   -d string
     	Set output path (default "./")

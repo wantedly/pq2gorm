@@ -15,10 +15,12 @@ After installing required version of Go, you can build and install `pq2gorm` by
 ```bash
 $ go get -d -u github.com/wantedly/pq2gorm
 $ cd $GOPATH/src/github.com/wantedly/pq2gorm
-$ go build
+$ make
+$ make install
 ```
 
-`go build` generates a binary file `pq2gorm`.
+`make` generates a binary into `bin/pq2gorm`.
+`make install` put it to `$GOPATH/bin`.
 
 ## How to use
 

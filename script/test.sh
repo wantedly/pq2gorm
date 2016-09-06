@@ -1,5 +1,7 @@
 #!/bin/bash
 
+bin/pq2gorm 'postgres://postgres:password@db:5432/test?sslmode=disable' -d out
+
 for f in `ls testdata/models`; do
   diff -u out/$f testdata/models/$f
 

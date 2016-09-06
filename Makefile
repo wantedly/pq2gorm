@@ -37,9 +37,7 @@ test:
 	sleep 5
 	docker-compose exec db psql -U postgres -d test -f /testdata/db.dump
 	docker-compose build pq2gorm
-	docker-compose run --rm pq2gorm 'postgres://postgres:password@db:5432/test?sslmode=disable' -d /out
-	script/compare.sh
-	@rm -rf out
+	docker-compose run --rm pq2gorm script/test.sh
 	@docker-compose stop > /dev/null
 	@docker-compose rm -f > /dev/null
 

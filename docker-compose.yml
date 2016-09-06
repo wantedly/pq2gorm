@@ -12,5 +12,3 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.test
-    volumes:
-      - $PWD/out:/out

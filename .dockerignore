@@ -3,5 +3,4 @@ README.md
 LICENSE
 vendor
 out
-script
-testdata
+testdata/db.dump

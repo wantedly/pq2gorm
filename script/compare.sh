@@ -1,7 +1,7 @@
 #!/bin/bash
 
 for f in `ls testdata/models`; do
-  diff out/$f testdata/models/$f
+  diff -u out/$f testdata/models/$f
 
   if [[ $? -gt 0 ]]; then
     echo ""

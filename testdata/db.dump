@@ -65,8 +65,6 @@ ALTER SEQUENCE preferences_id_seq OWNED BY preferences.id;
 CREATE TABLE projects (
     id integer NOT NULL,
     company_id integer,
-    created_at timestamp without time zone,
-    updated_at timestamp without time zone,
     title character varying(255),
     description text,
     location text,

@@ -30,12 +30,16 @@ install:
 
 .PHONY: test
 test:
+	rm -rf out
 	docker-compose stop
 	docker-compose rm -f
 	docker-compose up -d db
 	sleep 5
 	docker-compose exec db psql -U postgres -d test -f /testdata/db.dump
+	docker-compose build pq2gorm
 	docker-compose run --rm pq2gorm 'postgres://postgres:password@db:5432/test?sslmode=disable' -d /out
+	script/compare.sh
+	rm -rf out
 
 .PHONY: update-deps
 update-deps: glide

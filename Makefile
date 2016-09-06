@@ -28,6 +28,15 @@ endif
 install:
 	go install $(LDFLAGS)
 
+.PHONY: test
+test:
+	docker-compose stop
+	docker-compose rm -f
+	docker-compose up -d db
+	sleep 5
+	docker-compose exec db psql -U postgres -d test -f /testdata/db.dump
+	docker-compose run --rm pq2gorm 'postgres://postgres:password@db:5432/test?sslmode=disable' -d /out
+
 .PHONY: update-deps
 update-deps: glide
 	glide update

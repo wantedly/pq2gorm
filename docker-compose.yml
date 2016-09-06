@@ -1,0 +1,16 @@
+version: '2'
+services:
+  db:
+    image: postgres:9.6
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=test
+    volumes:
+      - $PWD/testdata:/testdata
+  pq2gorm:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    volumes:
+      - $PWD/out:/out

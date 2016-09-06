@@ -72,19 +72,19 @@ func genModel(tableName string, outPath string, db *sql.DB) error {
 
 		json := genJSON(columnName, columnDefault, primaryKeys)
 
-		if dataType == "timestamp with time zone" {
+		if dataType == "timestamp with time zone" || dataType == "timestamp without time zone" {
 			needTimePackage = true
-		}
+			dataType = "time.Time"
 
-		// If have to use pointer
-		if dataType == "timestamp with time zone" && isNullable == "YES" {
-			hasNullRecords, err := hasNullRecords(tableName, columnName, db)
-			if err != nil {
-				return err
-			}
+			if isNullable == "YES" {
+				hasNullRecords, err := hasNullRecords(tableName, columnName, db)
+				if err != nil {
+					return err
+				}
 
-			if hasNullRecords {
-				dataType = "*time.Time"
+				if hasNullRecords {
+					dataType = "*time.Time"
+				}
 			}
 		}
 

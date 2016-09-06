@@ -88,6 +88,10 @@ func genModel(tableName string, outPath string, db *sql.DB) error {
 			}
 		}
 
+		if dataType == "double precision" {
+			dataType = "float32"
+		}
+
 		m := gormColName(columnName) + " " + gormDataType(dataType) + " `" + json + "`\n"
 		gormStr += m
 

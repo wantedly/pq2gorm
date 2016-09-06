@@ -1,5 +1,7 @@
 # pq2gorm - Generate [gorm](https://github.com/jinzhu/gorm) model structs from PostgreSQL database schema
 
+[![Build Status](https://travis-ci.org/wantedly/pq2gorm.svg?branch=master)](https://travis-ci.org/wantedly/pq2gorm)
+
 pq2gorm is a generator of [gorm](https://github.com/jinzhu/gorm) model structs from a PostgresSQL database.
 
 * Input: Connection URI of a PostgresSQL database.

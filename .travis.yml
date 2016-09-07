@@ -1,7 +1,11 @@
 sudo: required
 services:
   - docker
+language: go
+go:
+  - '1.7'
 script:
+  - make deps
   - make test
   - make generate-test
 notifications:

@@ -5,7 +5,6 @@ import (
 	"go/format"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/gedex/inflector"
@@ -72,20 +71,18 @@ func genModel(tableName string, outPath string, db *sql.DB) error {
 
 		json := genJSON(columnName, columnDefault, primaryKeys)
 
-		if dataType == "timestamp with time zone" {
+		if dataType == "timestamp with time zone" || dataType == "timestamp without time zone" {
 			needTimePackage = true
+
+			if isNullable == "YES" {
+				dataType = "*time.Time"
+			} else {
+				dataType = "time.Time"
+			}
 		}
 
-		// If have to use pointer
-		if dataType == "timestamp with time zone" && isNullable == "YES" {
-			hasNullRecords, err := hasNullRecords(tableName, columnName, db)
-			if err != nil {
-				return err
-			}
-
-			if hasNullRecords {
-				dataType = "*time.Time"
-			}
+		if dataType == "double precision" {
+			dataType = "float32"
 		}
 
 		m := gormColName(columnName) + " " + gormDataType(dataType) + " `" + json + "`\n"
@@ -171,23 +168,4 @@ func getPrimaryKeys(tableName string, db *sql.DB) (map[string]bool, error) {
 	}
 
 	return primaryKeys, nil
-}
-
-func hasNullRecords(tableName string, columnName string, db *sql.DB) (bool, error) {
-	query := `SELECT COUNT(*) FROM ` + tableName + ` WHERE ` + columnName + ` IS NULL;`
-
-	var count string
-
-	err := db.QueryRow(query).Scan(&count)
-	if err != nil {
-		return false, err
-	}
-
-	val, _ := strconv.ParseInt(count, 10, 64)
-
-	if val > 0 {
-		return true, nil
-	}
-
-	return false, nil
 }

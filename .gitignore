@@ -25,6 +25,7 @@ _testmain.go
 
 *.exe
 *.test
+!Dockerfile.test
 *.prof
 
 # Output of the go coverage tool, specifically when used with LiteIDE
@@ -62,3 +63,5 @@ Temporary Items
 /vendor
 /bin
 /pq2gorm
+
+/out

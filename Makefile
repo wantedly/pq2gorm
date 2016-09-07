@@ -18,18 +18,8 @@ clean:
 deps: glide
 	glide install
 
-.PHONY: glide
-glide:
-ifndef GLIDE
-	curl https://glide.sh/get | sh
-endif
-
-.PHONY: install
-install:
-	go install $(LDFLAGS)
-
-.PHONY: test
-test:
+.PHONY: generate-test
+generate-test:
 	@docker-compose stop > /dev/null
 	@docker-compose rm -f > /dev/null
 	docker-compose up -d db
@@ -39,6 +29,16 @@ test:
 	docker-compose run --rm pq2gorm script/test.sh
 	@docker-compose stop > /dev/null
 	@docker-compose rm -f > /dev/null
+
+.PHONY: glide
+glide:
+ifndef GLIDE
+	curl https://glide.sh/get | sh
+endif
+
+.PHONY: install
+install:
+	go install $(LDFLAGS)
 
 .PHONY: update-deps
 update-deps: glide

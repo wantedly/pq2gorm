@@ -49,9 +49,11 @@ func genJSON(columnName, columnDefault string, primaryKeys map[string]bool) (jso
 
 // Singlarlize table name and upper initial character
 func gormTableName(s string) string {
-	s = strings.ToLower(s)
-	s = inflector.Singularize(s)
-	return strings.Title(s)
+	var tableName string
+
+	tableName = strings.ToLower(s)
+	tableName = inflector.Singularize(tableName)
+	return strings.Title(tableName)
 }
 
 // Ex: facebook_uid → FacebookUID

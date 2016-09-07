@@ -30,7 +30,6 @@ install:
 
 .PHONY: test
 test:
-	@rm -rf out
 	@docker-compose stop > /dev/null
 	@docker-compose rm -f > /dev/null
 	docker-compose up -d db

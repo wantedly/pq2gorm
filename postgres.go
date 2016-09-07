@@ -86,7 +86,7 @@ func genModel(tableName string, outPath string, db *sql.DB) error {
 			dataType = "float32"
 		}
 
-		m := gormColName(columnName) + " " + gormDataType(dataType) + " `" + json + "`\n"
+		m := gormColName(columnName) + " " + dataType + " `" + json + "`\n"
 		gormStr += m
 
 		isInfered, infColName := inferORM(columnName)

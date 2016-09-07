@@ -1,5 +1,5 @@
-hash: 7e724c4d8c4a6fd8ede8d4edd755fcb3483404f86cb1d6c5596039906d6ecfe6
-updated: 2016-09-05T16:08:56.757679012+09:00
+hash: a56e962010d68ac952dd59abffeb2b8d50f79a4d464d4a5f84c4d386cbe5974c
+updated: 2016-09-07T15:26:25.189713017+09:00
 imports:
 - name: github.com/gedex/inflector
   version: 91797f1712fd58f224781be1080b8613d096187e
@@ -7,4 +7,6 @@ imports:
   version: 50761b0867bd1d9d069276790bcd4a3bccf2324a
   subpackages:
   - oid
+- name: github.com/serenize/snaker
+  version: 8824b61eca66d308fcb2d515287d3d7a28dba8d6
 testImports: []

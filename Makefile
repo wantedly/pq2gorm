@@ -18,6 +18,18 @@ clean:
 deps: glide
 	glide install
 
+.PHONY: generate-test
+generate-test:
+	@docker-compose stop > /dev/null
+	@docker-compose rm -f > /dev/null
+	docker-compose up -d db
+	script/ping_db.sh
+	docker-compose exec db psql -U postgres -d test -f /testdata/testdata.sql
+	docker-compose build pq2gorm
+	docker-compose run --rm pq2gorm script/test.sh
+	@docker-compose stop > /dev/null
+	@docker-compose rm -f > /dev/null
+
 .PHONY: glide
 glide:
 ifndef GLIDE
@@ -30,16 +42,7 @@ install:
 
 .PHONY: test
 test:
-	@rm -rf out
-	@docker-compose stop > /dev/null
-	@docker-compose rm -f > /dev/null
-	docker-compose up -d db
-	script/ping_db.sh
-	docker-compose exec db psql -U postgres -d test -f /testdata/db.dump
-	docker-compose build pq2gorm
-	docker-compose run --rm pq2gorm script/test.sh
-	@docker-compose stop > /dev/null
-	@docker-compose rm -f > /dev/null
+	go test -v
 
 .PHONY: update-deps
 update-deps: glide

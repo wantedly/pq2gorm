@@ -95,6 +95,42 @@ ALTER TABLE projects_id_seq OWNER TO postgres;
 
 ALTER SEQUENCE projects_id_seq OWNED BY projects.id;
 
+--
+-- Name: post_comments; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE post_comments (
+    id integer NOT NULL,
+    user_id integer,
+    post_id integer,
+    content text,
+    created_at timestamp without time zone,
+    updated_at timestamp without time zone
+);
+
+
+ALTER TABLE post_comments OWNER TO postgres;
+
+--
+-- Name: post_comments_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE post_comments_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE post_comments_id_seq OWNER TO postgres;
+
+--
+-- Name: post_comments_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE post_comments_id_seq OWNED BY post_comments.id;
+
 
 --
 -- Name: id; Type: DEFAULT; Schema: public; Owner: postgres
@@ -108,6 +144,12 @@ ALTER TABLE ONLY preferences ALTER COLUMN id SET DEFAULT nextval('preferences_id
 --
 
 ALTER TABLE ONLY projects ALTER COLUMN id SET DEFAULT nextval('projects_id_seq'::regclass);
+
+--
+-- Name: id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY post_comments ALTER COLUMN id SET DEFAULT nextval('post_comments_id_seq'::regclass);
 
 --
 -- PostgreSQL database dump complete

@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/gedex/inflector"
+	"github.com/serenize/snaker"
 )
 
 // Infer belongs_to Relation from column's name
@@ -53,6 +54,8 @@ func gormTableName(s string) string {
 
 	tableName = strings.ToLower(s)
 	tableName = inflector.Singularize(tableName)
+	tableName = snaker.SnakeToCamel(tableName)
+
 	return strings.Title(tableName)
 }
 

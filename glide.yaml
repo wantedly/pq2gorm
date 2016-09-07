@@ -2,3 +2,4 @@ package: github.com/wantedly/pq2gorm
 import:
 - package: github.com/gedex/inflector
 - package: github.com/lib/pq
+- package: github.com/serenize/snaker

@@ -76,17 +76,17 @@ func genModel(tableName string, outPath string, db *sql.DB) error {
 			needTimePackage = true
 
 			if isNullable == "YES" {
-				dataType = "*time.Time"
+				fieldType = "*time.Time"
 			} else {
-				dataType = "time.Time"
+				fieldType = "time.Time"
 			}
 		}
 
-		if dataType == "double precision" {
-			dataType = "float32"
+		if fieldType == "double precision" {
+			fieldType = "float32"
 		}
 
-		m := gormColName(columnName) + " " + dataType + " `" + json + "`\n"
+		m := gormColName(columnName) + " " + fieldType + " `" + json + "`\n"
 		gormStr += m
 
 		isInfered, infColName := inferORM(columnName)

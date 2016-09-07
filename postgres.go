@@ -70,8 +70,9 @@ func genModel(tableName string, outPath string, db *sql.DB) error {
 		}
 
 		json := genJSON(columnName, columnDefault, primaryKeys)
+		fieldType := gormDataType(dataType)
 
-		if dataType == "timestamp with time zone" || dataType == "timestamp without time zone" {
+		if fieldType == "time.Time" || fieldType == "*time.Time" {
 			needTimePackage = true
 
 			if isNullable == "YES" {

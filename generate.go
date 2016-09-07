@@ -88,7 +88,7 @@ func gormDataType(s string) string {
 		return "string"
 	case "boolean":
 		return "bool"
-	case "timestamp with time zone":
+	case "timestamp with time zone", "timestamp without time zone":
 		return "time.Time"
 	case "date":
 		return "*time.Time"

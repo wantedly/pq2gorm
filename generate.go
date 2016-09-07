@@ -90,6 +90,8 @@ func gormDataType(s string) string {
 		return "bool"
 	case "timestamp with time zone":
 		return "time.Time"
+	case "date":
+		return "*time.Time"
 	default:
 		return s
 	}

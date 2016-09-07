@@ -32,6 +32,8 @@ func TestGormColName(t *testing.T) {
 		{"facebook_uid", "FacebookUID"},
 		{"candidacy", "Candidacy"},
 		{"video_id", "VideoID"},
+		{"image_url", "ImageURL"},
+		{"curl_name", "CurlName"},
 	}
 
 	for _, td := range testdata {

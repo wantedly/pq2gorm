@@ -35,7 +35,7 @@ test:
 	@docker-compose rm -f > /dev/null
 	docker-compose up -d db
 	script/ping_db.sh
-	docker-compose exec db psql -U postgres -d test -f /testdata/db.dump
+	docker-compose exec db psql -U postgres -d test -f /testdata/testdata.sql
 	docker-compose build pq2gorm
 	docker-compose run --rm pq2gorm script/test.sh
 	@docker-compose stop > /dev/null

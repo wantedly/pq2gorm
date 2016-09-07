@@ -40,6 +40,10 @@ endif
 install:
 	go install $(LDFLAGS)
 
+.PHONY: test
+test:
+	go test -v
+
 .PHONY: update-deps
 update-deps: glide
 	glide update

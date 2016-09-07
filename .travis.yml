@@ -4,8 +4,9 @@ services:
 language: go
 go:
   - '1.7'
-script:
+install:
   - make deps
+script:
   - make test
   - make generate-test
 notifications:

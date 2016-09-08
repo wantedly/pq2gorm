@@ -65,12 +65,8 @@ func gormColName(s string) string {
 	ss := strings.Split(s, "_")
 
 	for i, word := range ss {
-		if strings.Contains(word, "id") {
-			word = strings.Replace(word, "id", "ID", -1)
-		}
-
-		if strings.Contains(word, "url") {
-			word = strings.Replace(word, "url", "URL", -1)
+		if word == "id" || word == "uid" || word == "url" {
+			word = strings.ToUpper(word)
 		}
 
 		ss[i] = strings.Title(word)

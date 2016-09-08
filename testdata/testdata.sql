@@ -30,6 +30,7 @@ CREATE TABLE preferences (
     updated_at timestamp without time zone,
     locale character varying(255) DEFAULT 'ja'::character varying,
     deleted_at timestamp without time zone,
+    birthday date,
     email_subscriptions text,
     searchable boolean DEFAULT true NOT NULL
 );

@@ -70,22 +70,23 @@ func genModel(tableName string, outPath string, db *sql.DB) error {
 		}
 
 		json := genJSON(columnName, columnDefault, primaryKeys)
+		fieldType := gormDataType(dataType)
 
-		if dataType == "timestamp with time zone" || dataType == "timestamp without time zone" {
+		if fieldType == "time.Time" || fieldType == "*time.Time" {
 			needTimePackage = true
 
 			if isNullable == "YES" {
-				dataType = "*time.Time"
+				fieldType = "*time.Time"
 			} else {
-				dataType = "time.Time"
+				fieldType = "time.Time"
 			}
 		}
 
-		if dataType == "double precision" {
-			dataType = "float32"
+		if fieldType == "double precision" {
+			fieldType = "float32"
 		}
 
-		m := gormColName(columnName) + " " + gormDataType(dataType) + " `" + json + "`\n"
+		m := gormColName(columnName) + " " + fieldType + " `" + json + "`\n"
 		gormStr += m
 
 		isInfered, infColName := inferORM(columnName)

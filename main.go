@@ -5,12 +5,16 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	_ "github.com/lib/pq"
 )
 
 func main() {
-	var dir string
+	var (
+		dir string
+		ts  string
+	)
 
 	f := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
@@ -20,6 +24,8 @@ func main() {
 	}
 	f.StringVar(&dir, "dir", "./", "Set output path")
 	f.StringVar(&dir, "d", "./", "Set output path")
+	f.StringVar(&ts, "tables", "", "Target tables")
+	f.StringVar(&ts, "t", "", "Target tables")
 
 	f.Parse(os.Args[1:])
 
@@ -49,7 +55,15 @@ func main() {
 	}
 	defer db.Close()
 
-	tables, err := getTableName(db)
+	var targets []string
+
+	for _, t := range strings.Split(ts, ",") {
+		if t != "" {
+			targets = append(targets, t)
+		}
+	}
+
+	tables, err := getTableName(db, targets)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

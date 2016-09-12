@@ -24,8 +24,8 @@ func main() {
 	}
 	f.StringVar(&dir, "dir", "./", "Set output path")
 	f.StringVar(&dir, "d", "./", "Set output path")
-	f.StringVar(&ts, "tables", "", "Target tables")
-	f.StringVar(&ts, "t", "", "Target tables")
+	f.StringVar(&ts, "tables", "", "Target tables (table1,table2,...)")
+	f.StringVar(&ts, "t", "", "Target tables (table1,table2,...)")
 
 	f.Parse(os.Args[1:])
 

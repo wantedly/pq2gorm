@@ -28,7 +28,7 @@ func retrieveTables(db *sql.DB, targets []string) (*sql.Rows, error) {
 	return db.Query(fmt.Sprintf(`select relname as TABLE_NAME from pg_stat_user_tables where relname in (%s)`, strings.Join(qs, ", ")), params...)
 }
 
-func getTableName(db *sql.DB, targets []string) ([]string, error) {
+func getTableNames(db *sql.DB, targets []string) ([]string, error) {
 	var (
 		rows *sql.Rows
 		err  error

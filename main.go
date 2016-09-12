@@ -63,7 +63,7 @@ func main() {
 		}
 	}
 
-	tables, err := getTableName(db, targets)
+	tables, err := getTableNames(db, targets)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

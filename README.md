@@ -39,12 +39,12 @@ Usage: Generate gorm model structs from PostgreSQL database schema.
   -dir string
         Set output path (default "./")
   -t string
-        Target tables (table1,table2,...)
+        Target tables (table1,table2,...) (default: all tables)
   -tables string
-        Target tables (table1,table2,...)
+        Target tables (table1,table2,...) (default: all tables)
 ```
 
-**Example 1:** Generate gorm model files in current directory.
+**Example 1:** Generate gorm model files of all tables in current directory.
 
 ```bash
 $ pq2gorm "postgresql://user:password@host:port/dbname?sslmode=disable"
@@ -59,7 +59,7 @@ type User struct {
 }
 ```
 
-**Example 2:** Generate gorm model files in `./out` directory.
+**Example 2:** Generate gorm model files of all tables in `./out` directory.
 
 ```bash
 $ pq2gorm "postgresql://user:password@host:port/dbname?sslmode=disable" -d ./out

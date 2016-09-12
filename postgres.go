@@ -5,18 +5,45 @@ import (
 	"go/format"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gedex/inflector"
 	_ "github.com/lib/pq"
 )
 
-func getTableName(db *sql.DB) ([]string, error) {
-	query := `select relname as TABLE_NAME from pg_stat_user_tables`
+func retrieveAllTables(db *sql.DB) (*sql.Rows, error) {
+	return db.Query(`select relname as TABLE_NAME from pg_stat_user_tables`)
+}
 
-	rows, err := db.Query(query)
-	if err != nil {
-		return nil, err
+func retrieveTables(db *sql.DB, targets []string) (*sql.Rows, error) {
+	qs := []string{}
+	params := []interface{}{}
+
+	for i, t := range targets {
+		qs = append(qs, "$"+strconv.Itoa(i+1))
+		params = append(params, t)
+	}
+
+	return db.Query(`select relname as TABLE_NAME from pg_stat_user_tables where relname in (`+strings.Join(qs, ", ")+`)`, params...)
+}
+
+func getTableNames(db *sql.DB, targets []string) ([]string, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
+
+	if len(targets) == 0 {
+		rows, err = retrieveAllTables(db)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		rows, err = retrieveTables(db, targets)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	tableNames := []string{}

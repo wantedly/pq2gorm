@@ -35,12 +35,16 @@ Connection URI is necessary for running.
 $ pq2gorm
 Usage: Generate gorm model structs from PostgreSQL database schema.
   -d string
-    	Set output path (default "./")
+        Set output path (default "./")
   -dir string
-    	Set output path (default "./")
+        Set output path (default "./")
+  -t string
+        Target tables (table1,table2,...) (default: all tables)
+  -tables string
+        Target tables (table1,table2,...) (default: all tables)
 ```
 
-**Example 1:** Generate gorm model files in current directory.
+**Example 1:** Generate gorm model files of all tables in current directory.
 
 ```bash
 $ pq2gorm "postgresql://user:password@host:port/dbname?sslmode=disable"
@@ -55,10 +59,16 @@ type User struct {
 }
 ```
 
-**Example 2:** Generate gorm model files in `./out` directory.
+**Example 2:** Generate gorm model files of all tables in `./out` directory.
 
 ```bash
 $ pq2gorm "postgresql://user:password@host:port/dbname?sslmode=disable" -d ./out
+```
+
+**Example 3:** Generate gorm model files of `profiles` and `users` tables.
+
+```bash
+$ pq2gorm "postgresql://user:password@host:port/dbname?sslmode=disable" -d ./out -t profiles,users
 ```
 
 If the directory `./out` does not exist, `pq2gorm` creates `./out` directory with output files.

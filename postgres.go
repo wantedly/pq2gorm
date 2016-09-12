@@ -2,10 +2,10 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"go/format"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gedex/inflector"
@@ -21,11 +21,11 @@ func retrieveTables(db *sql.DB, targets []string) (*sql.Rows, error) {
 	params := []interface{}{}
 
 	for i, t := range targets {
-		qs = append(qs, fmt.Sprintf("$%d", i+1))
+		qs = append(qs, "$"+strconv.Itoa(i+1))
 		params = append(params, t)
 	}
 
-	return db.Query(fmt.Sprintf(`select relname as TABLE_NAME from pg_stat_user_tables where relname in (%s)`, strings.Join(qs, ", ")), params...)
+	return db.Query(`select relname as TABLE_NAME from pg_stat_user_tables where relname in (`+strings.Join(qs, ", ")+`)`, params...)
 }
 
 func getTableNames(db *sql.DB, targets []string) ([]string, error) {

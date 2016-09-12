@@ -19,7 +19,7 @@ func main() {
 	f := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
 	f.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: Generate gorm model structs from PostgreSQL database schema.\n")
+		fmt.Fprintf(os.Stderr, "Usage: "+os.Args[0]+" <PostgreSQL URL> [<options>]\n\nOptions:\n")
 		f.PrintDefaults() // Print usage of options
 	}
 	f.StringVar(&dir, "dir", "./", "Set output path")

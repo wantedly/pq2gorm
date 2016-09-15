@@ -115,18 +115,19 @@ func (p *Postgres) RetrieveTables(targets []string) ([]string, error) {
 		}
 	}
 
-	tableNames := []string{}
+	tables := []string{}
+	var table string
+
 	for rows.Next() {
-		var tableName string
-		err = rows.Scan(&tableName)
+		err = rows.Scan(&table)
 		if err != nil {
 			return nil, err
 		}
 
-		tableNames = append(tableNames, tableName)
+		tables = append(tables, table)
 	}
 
-	return tableNames, nil
+	return tables, nil
 }
 
 func (p *Postgres) RetrievePrimaryKeys(table string) (map[string]bool, error) {

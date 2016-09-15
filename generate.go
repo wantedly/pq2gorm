@@ -25,7 +25,7 @@ type TemplateParams struct {
 	NeedTimePackage bool
 }
 
-func GenerateModel(tableName string, pkeys map[string]bool, fields []*Field, outPath string) error {
+func GenerateModel(table string, pkeys map[string]bool, fields []*Field, outPath string) error {
 	var needTimePackage bool
 
 	templateFields := []*TemplateField{}
@@ -67,7 +67,7 @@ func GenerateModel(tableName string, pkeys map[string]bool, fields []*Field, out
 	}
 
 	params := &TemplateParams{
-		Name:            gormTableName(tableName),
+		Name:            gormTableName(table),
 		Fields:          templateFields,
 		NeedTimePackage: needTimePackage,
 	}
@@ -93,7 +93,7 @@ func GenerateModel(tableName string, pkeys map[string]bool, fields []*Field, out
 		return err
 	}
 
-	modelFile := filepath.Join(outPath, inflector.Singularize(tableName)+".go")
+	modelFile := filepath.Join(outPath, inflector.Singularize(table)+".go")
 
 	if err := ioutil.WriteFile(modelFile, src, 0644); err != nil {
 		return err

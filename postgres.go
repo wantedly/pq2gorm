@@ -34,7 +34,7 @@ func (p *Postgres) retrieveAllTables() (*sql.Rows, error) {
 	return p.DB.Query(`select relname as TABLE_NAME from pg_stat_user_tables`)
 }
 
-func (p *Postgres) retrieveTables(targets []string) (*sql.Rows, error) {
+func (p *Postgres) retrieveSelectedTables(targets []string) (*sql.Rows, error) {
 	qs := []string{}
 	params := []interface{}{}
 
@@ -97,7 +97,7 @@ func (p *Postgres) RetrieveFields(table string) ([]*Field, error) {
 	return fields, nil
 }
 
-func (p *Postgres) RetrieveTableNames(targets []string) ([]string, error) {
+func (p *Postgres) RetrieveTables(targets []string) ([]string, error) {
 	var (
 		rows *sql.Rows
 		err  error
@@ -109,7 +109,7 @@ func (p *Postgres) RetrieveTableNames(targets []string) ([]string, error) {
 			return nil, err
 		}
 	} else {
-		rows, err = p.retrieveTables(targets)
+		rows, err = p.retrieveSelectedTables(targets)
 		if err != nil {
 			return nil, err
 		}

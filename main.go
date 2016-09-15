@@ -1,13 +1,10 @@
 package main
 
 import (
-	"database/sql"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
-
-	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -48,12 +45,12 @@ func main() {
 
 	fmt.Printf("Connecting to database...\n")
 
-	db, err := sql.Open("postgres", pgURL)
+	postgres, err := NewPostgres(pgURL)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer postgres.DB.Close()
 
 	var targets []string
 
@@ -63,7 +60,7 @@ func main() {
 		}
 	}
 
-	tables, err := getTableNames(db, targets)
+	tables, err := postgres.GetTableNames(targets)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -72,7 +69,7 @@ func main() {
 	for _, tableName := range tables {
 		fmt.Printf("Table name: %s\n", tableName)
 
-		if err := genModel(tableName, dir, db); err != nil {
+		if err := postgres.GenModel(tableName, dir); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}

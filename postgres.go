@@ -12,11 +12,26 @@ import (
 	_ "github.com/lib/pq"
 )
 
-func retrieveAllTables(db *sql.DB) (*sql.Rows, error) {
-	return db.Query(`select relname as TABLE_NAME from pg_stat_user_tables`)
+type Postgres struct {
+	DB *sql.DB
 }
 
-func retrieveTables(db *sql.DB, targets []string) (*sql.Rows, error) {
+func NewPostgres(url string) (*Postgres, error) {
+	db, err := sql.Open("postgres", url)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Postgres{
+		DB: db,
+	}, nil
+}
+
+func (p *Postgres) retrieveAllTables() (*sql.Rows, error) {
+	return p.DB.Query(`select relname as TABLE_NAME from pg_stat_user_tables`)
+}
+
+func (p *Postgres) retrieveTables(targets []string) (*sql.Rows, error) {
 	qs := []string{}
 	params := []interface{}{}
 
@@ -25,22 +40,22 @@ func retrieveTables(db *sql.DB, targets []string) (*sql.Rows, error) {
 		params = append(params, t)
 	}
 
-	return db.Query(`select relname as TABLE_NAME from pg_stat_user_tables where relname in (`+strings.Join(qs, ", ")+`)`, params...)
+	return p.DB.Query(`select relname as TABLE_NAME from pg_stat_user_tables where relname in (`+strings.Join(qs, ", ")+`)`, params...)
 }
 
-func getTableNames(db *sql.DB, targets []string) ([]string, error) {
+func (p *Postgres) GetTableNames(targets []string) ([]string, error) {
 	var (
 		rows *sql.Rows
 		err  error
 	)
 
 	if len(targets) == 0 {
-		rows, err = retrieveAllTables(db)
+		rows, err = p.retrieveAllTables()
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		rows, err = retrieveTables(db, targets)
+		rows, err = p.retrieveTables(targets)
 		if err != nil {
 			return nil, err
 		}
@@ -60,8 +75,8 @@ func getTableNames(db *sql.DB, targets []string) ([]string, error) {
 	return tableNames, nil
 }
 
-func genModel(tableName string, outPath string, db *sql.DB) error {
-	primaryKeys, err := getPrimaryKeys(tableName, db)
+func (p *Postgres) GenModel(tableName string, outPath string) error {
+	primaryKeys, err := p.getPrimaryKeys(tableName)
 	if err != nil {
 		return err
 	}
@@ -76,7 +91,7 @@ func genModel(tableName string, outPath string, db *sql.DB) error {
       ordinal_position;
     `
 
-	rows, err := db.Query(query)
+	rows, err := p.DB.Query(query)
 	if err != nil {
 		return err
 	}
@@ -157,7 +172,7 @@ func genModel(tableName string, outPath string, db *sql.DB) error {
 	return nil
 }
 
-func getPrimaryKeys(tableName string, db *sql.DB) (map[string]bool, error) {
+func (p *Postgres) getPrimaryKeys(tableName string) (map[string]bool, error) {
 	query :=
 		`
     select
@@ -179,7 +194,7 @@ func getPrimaryKeys(tableName string, db *sql.DB) (map[string]bool, error) {
       tc.constraint_name=ccu.constraint_name
     `
 
-	rows, err := db.Query(query)
+	rows, err := p.DB.Query(query)
 	if err != nil {
 		return nil, err
 	}

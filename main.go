@@ -83,7 +83,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err := GenModel(table, pkeys, fields, dir); err != nil {
+		if err := GenerateModel(table, pkeys, fields, dir); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}

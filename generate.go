@@ -25,7 +25,7 @@ type TemplateParams struct {
 	NeedTimePackage bool
 }
 
-func GenModel(tableName string, pkeys map[string]bool, fields []*Field, outPath string) error {
+func GenerateModel(tableName string, pkeys map[string]bool, fields []*Field, outPath string) error {
 	var needTimePackage bool
 
 	templateFields := []*TemplateField{}

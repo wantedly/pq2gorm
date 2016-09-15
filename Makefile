@@ -1,12 +1,11 @@
 NAME := pq2gorm
-SRC := $(shell find . -type f -name "*.go")
 LDFLAGS := -ldflags="-s -w"
 
 GLIDE := $(shell command -v glide 2> /dev/null)
 
 .DEFAULT_GOAL := bin/$(NAME)
 
-bin/$(NAME): deps $(SRC)
+bin/$(NAME): deps
 	go build $(LDFLAGS) -o bin/$(NAME)
 
 .PHONY: clean

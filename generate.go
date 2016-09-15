@@ -1,21 +1,36 @@
 package main
 
 import (
+	"bytes"
 	"go/format"
-	"os"
+	"io/ioutil"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	"github.com/gedex/inflector"
 	"github.com/serenize/snaker"
 )
 
+type TemplateField struct {
+	Name    string
+	Type    string
+	Tag     string
+	Comment string
+}
+
+type TemplateParams struct {
+	Name            string
+	Fields          []*TemplateField
+	NeedTimePackage bool
+}
+
 func GenModel(tableName string, pkeys map[string]bool, fields []*Field, outPath string) error {
-	var gormStr string
 	var needTimePackage bool
 
+	templateFields := []*TemplateField{}
+
 	for _, field := range fields {
-		json := genJSON(field.Name, field.Default, pkeys)
 		fieldType := gormDataType(field.Type)
 
 		if fieldType == "time.Time" || fieldType == "*time.Time" {
@@ -32,46 +47,57 @@ func GenModel(tableName string, pkeys map[string]bool, fields []*Field, outPath 
 			fieldType = "float32"
 		}
 
-		m := gormColName(field.Name) + " " + fieldType + " `" + json + "`\n"
-		gormStr += m
+		templateFields = append(templateFields, &TemplateField{
+			Name: gormColName(field.Name),
+			Type: fieldType,
+			Tag:  genJSON(field.Name, field.Default, pkeys),
+		})
 
 		isInfered, infColName := inferORM(field.Name)
 
 		// Add belongs_to relation
 		if isInfered {
-			json := genJSON(strings.ToLower(infColName), "", nil)
-			comment := "// This line is infered from column name \"" + field.Name + "\"."
-			infColName = gormColName(infColName)
-
-			m := infColName + " *" + infColName + " `" + json + "` " + comment + "\n"
-			gormStr += m
+			templateFields = append(templateFields, &TemplateField{
+				Name:    gormColName(infColName),
+				Type:    "*" + gormColName(infColName),
+				Tag:     genJSON(strings.ToLower(infColName), "", nil),
+				Comment: "This line is infered from column name \"" + field.Name + "\".",
+			})
 		}
 	}
 
-	var importPackage string
-	if needTimePackage {
-		importPackage = "import \"time\"\n\n"
-	} else {
-		importPackage = ""
+	params := &TemplateParams{
+		Name:            gormTableName(tableName),
+		Fields:          templateFields,
+		NeedTimePackage: needTimePackage,
 	}
 
-	gormStr = "package models\n\n" + importPackage + "type " + gormTableName(tableName) + " struct {\n" + gormStr + "}\n"
+	body, err := Asset("_templates/model.go.tmpl")
+	if err != nil {
+		return err
+	}
+
+	tmpl, err := template.New("").Parse(string(body))
+	if err != nil {
+		return err
+	}
+
+	var buf bytes.Buffer
+
+	if err := tmpl.Execute(&buf, params); err != nil {
+		return err
+	}
+
+	src, err := format.Source(buf.Bytes())
+	if err != nil {
+		return err
+	}
 
 	modelFile := filepath.Join(outPath, inflector.Singularize(tableName)+".go")
-	file, err := os.Create(modelFile)
 
-	if err != nil {
+	if err := ioutil.WriteFile(modelFile, src, 0644); err != nil {
 		return err
 	}
-
-	defer file.Close()
-
-	src, err := format.Source(([]byte)(gormStr))
-	if err != nil {
-		return err
-	}
-
-	file.Write(src)
 
 	return nil
 }

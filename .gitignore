@@ -65,3 +65,5 @@ Temporary Items
 /pq2gorm
 
 /out
+
+/bindata.go

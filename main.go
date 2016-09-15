@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+//go:generate go-bindata _templates/
+
 func main() {
 	var (
 		dir string

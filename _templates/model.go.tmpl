@@ -1,0 +1,10 @@
+package models
+
+{{ if .NeedTimePackage }}	import "time"
+{{ end -}}
+
+type {{ .Name }} struct {
+{{ range .Fields -}}
+	{{ .Name }} {{ .Type }} `{{ .Tag }}` {{ if (ne .Comment "") }}// {{ .Comment }}{{ end }}
+{{ end }}
+}

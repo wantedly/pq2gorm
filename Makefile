@@ -6,6 +6,7 @@ GLIDE := $(shell command -v glide 2> /dev/null)
 .DEFAULT_GOAL := bin/$(NAME)
 
 bin/$(NAME): deps
+	go generate
 	go build $(LDFLAGS) -o bin/$(NAME)
 
 .PHONY: clean
@@ -15,6 +16,7 @@ clean:
 
 .PHONY: deps
 deps: glide
+	go get github.com/jteeuwen/go-bindata/...
 	glide install
 
 .PHONY: generate-test
@@ -37,10 +39,12 @@ endif
 
 .PHONY: install
 install:
+	go generate
 	go install $(LDFLAGS)
 
 .PHONY: test
 test:
+	go generate
 	go test -v
 
 .PHONY: update-deps

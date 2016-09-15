@@ -22,7 +22,7 @@ func TestGormTableName(t *testing.T) {
 	}
 }
 
-func TestGormColName(t *testing.T) {
+func TestGormColumnName(t *testing.T) {
 	var testdata = []struct {
 		in  string
 		out string
@@ -37,7 +37,7 @@ func TestGormColName(t *testing.T) {
 	}
 
 	for _, td := range testdata {
-		s := gormColName(td.in)
+		s := gormColumnName(td.in)
 
 		if s != td.out {
 			t.Fatalf("Field name does not match. expect: %s, actual: %s", td.out, s)

@@ -48,7 +48,7 @@ func GenerateModel(tableName string, pkeys map[string]bool, fields []*Field, out
 		}
 
 		templateFields = append(templateFields, &TemplateField{
-			Name: gormColName(field.Name),
+			Name: gormColumnName(field.Name),
 			Type: fieldType,
 			Tag:  genJSON(field.Name, field.Default, pkeys),
 		})
@@ -58,8 +58,8 @@ func GenerateModel(tableName string, pkeys map[string]bool, fields []*Field, out
 		// Add belongs_to relation
 		if isInfered {
 			templateFields = append(templateFields, &TemplateField{
-				Name:    gormColName(infColName),
-				Type:    "*" + gormColName(infColName),
+				Name:    gormColumnName(infColName),
+				Type:    "*" + gormColumnName(infColName),
 				Tag:     genJSON(strings.ToLower(infColName), "", nil),
 				Comment: "This line is infered from column name \"" + field.Name + "\".",
 			})
@@ -155,7 +155,7 @@ func gormTableName(s string) string {
 }
 
 // Ex: facebook_uid → FacebookUID
-func gormColName(s string) string {
+func gormColumnName(s string) string {
 	s = strings.ToLower(s)
 	ss := strings.Split(s, "_")
 
@@ -166,6 +166,7 @@ func gormColName(s string) string {
 
 		ss[i] = strings.Title(word)
 	}
+
 	return strings.Join(ss, "")
 }
 

@@ -49,7 +49,7 @@ Options:
 		os.Exit(1)
 	}
 
-	fmt.Printf("Connecting to database...\n")
+	fmt.Println("Connecting to database...")
 
 	postgres, err := NewPostgres(url)
 	if err != nil {
@@ -73,7 +73,7 @@ Options:
 	}
 
 	for _, table := range tables {
-		fmt.Printf("Table name: %s\n", table)
+		fmt.Println("Table name: " + table)
 
 		pkeys, err := postgres.RetrievePrimaryKeys(table)
 		if err != nil {

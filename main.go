@@ -18,7 +18,11 @@ func main() {
 	f := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
 	f.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: "+os.Args[0]+" <PostgreSQL URL> [<options>]\n\nOptions:\n")
+		fmt.Fprintf(os.Stderr, `Usage of %s:
+  %s <PostgreSQL URL> [<options>]
+
+Options:
+`, os.Args[0], os.Args[0])
 		f.PrintDefaults() // Print usage of options
 	}
 	f.StringVar(&dir, "dir", "./", "Set output path")

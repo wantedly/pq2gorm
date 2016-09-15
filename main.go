@@ -66,10 +66,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	for _, tableName := range tables {
-		fmt.Printf("Table name: %s\n", tableName)
+	for _, table := range tables {
+		fmt.Printf("Table name: %s\n", table)
 
-		if err := postgres.GenModel(tableName, dir); err != nil {
+		pkeys, err := postgres.RetrievePrimaryKeys(table)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+
+		fields, err := postgres.RetrieveFields(table)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+
+		if err := GenModel(table, pkeys, fields, dir); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}

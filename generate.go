@@ -1,11 +1,80 @@
 package main
 
 import (
+	"go/format"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gedex/inflector"
 	"github.com/serenize/snaker"
 )
+
+func GenModel(tableName string, pkeys map[string]bool, fields []*Field, outPath string) error {
+	var gormStr string
+	var needTimePackage bool
+
+	for _, field := range fields {
+		json := genJSON(field.Name, field.Default, pkeys)
+		fieldType := gormDataType(field.Type)
+
+		if fieldType == "time.Time" || fieldType == "*time.Time" {
+			needTimePackage = true
+
+			if field.Nullable {
+				fieldType = "*time.Time"
+			} else {
+				fieldType = "time.Time"
+			}
+		}
+
+		if fieldType == "double precision" {
+			fieldType = "float32"
+		}
+
+		m := gormColName(field.Name) + " " + fieldType + " `" + json + "`\n"
+		gormStr += m
+
+		isInfered, infColName := inferORM(field.Name)
+
+		// Add belongs_to relation
+		if isInfered {
+			json := genJSON(strings.ToLower(infColName), "", nil)
+			comment := "// This line is infered from column name \"" + field.Name + "\"."
+			infColName = gormColName(infColName)
+
+			m := infColName + " *" + infColName + " `" + json + "` " + comment + "\n"
+			gormStr += m
+		}
+	}
+
+	var importPackage string
+	if needTimePackage {
+		importPackage = "import \"time\"\n\n"
+	} else {
+		importPackage = ""
+	}
+
+	gormStr = "package models\n\n" + importPackage + "type " + gormTableName(tableName) + " struct {\n" + gormStr + "}\n"
+
+	modelFile := filepath.Join(outPath, inflector.Singularize(tableName)+".go")
+	file, err := os.Create(modelFile)
+
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
+
+	src, err := format.Source(([]byte)(gormStr))
+	if err != nil {
+		return err
+	}
+
+	file.Write(src)
+
+	return nil
+}
 
 // Infer belongs_to Relation from column's name
 func inferORM(s string) (bool, string) {

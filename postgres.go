@@ -2,13 +2,9 @@ package main
 
 import (
 	"database/sql"
-	"go/format"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/gedex/inflector"
 	_ "github.com/lib/pq"
 )
 
@@ -50,7 +46,7 @@ func (p *Postgres) retrieveTables(targets []string) (*sql.Rows, error) {
 	return p.DB.Query(`select relname as TABLE_NAME from pg_stat_user_tables where relname in (`+strings.Join(qs, ", ")+`)`, params...)
 }
 
-func (p *Postgres) retrieveFields(table string) ([]*Field, error) {
+func (p *Postgres) RetrieveFields(table string) ([]*Field, error) {
 	query :=
 		`
     select column_name, data_type, COALESCE(column_default, '') as column_default, is_nullable
@@ -133,83 +129,7 @@ func (p *Postgres) RetrieveTableNames(targets []string) ([]string, error) {
 	return tableNames, nil
 }
 
-func (p *Postgres) GenModel(tableName string, outPath string) error {
-	primaryKeys, err := p.retrievePrimaryKeys(tableName)
-	if err != nil {
-		return err
-	}
-
-	fields, err := p.retrieveFields(tableName)
-	if err != nil {
-		return err
-	}
-
-	var gormStr string
-	var needTimePackage bool
-
-	for _, field := range fields {
-		json := genJSON(field.Name, field.Default, primaryKeys)
-		fieldType := gormDataType(field.Type)
-
-		if fieldType == "time.Time" || fieldType == "*time.Time" {
-			needTimePackage = true
-
-			if field.Nullable {
-				fieldType = "*time.Time"
-			} else {
-				fieldType = "time.Time"
-			}
-		}
-
-		if fieldType == "double precision" {
-			fieldType = "float32"
-		}
-
-		m := gormColName(field.Name) + " " + fieldType + " `" + json + "`\n"
-		gormStr += m
-
-		isInfered, infColName := inferORM(field.Name)
-
-		// Add belongs_to relation
-		if isInfered {
-			json := genJSON(strings.ToLower(infColName), "", nil)
-			comment := "// This line is infered from column name \"" + field.Name + "\"."
-			infColName = gormColName(infColName)
-
-			m := infColName + " *" + infColName + " `" + json + "` " + comment + "\n"
-			gormStr += m
-		}
-	}
-
-	var importPackage string
-	if needTimePackage {
-		importPackage = "import \"time\"\n\n"
-	} else {
-		importPackage = ""
-	}
-
-	gormStr = "package models\n\n" + importPackage + "type " + gormTableName(tableName) + " struct {\n" + gormStr + "}\n"
-
-	modelFile := filepath.Join(outPath, inflector.Singularize(tableName)+".go")
-	file, err := os.Create(modelFile)
-
-	if err != nil {
-		return err
-	}
-
-	defer file.Close()
-
-	src, err := format.Source(([]byte)(gormStr))
-	if err != nil {
-		return err
-	}
-
-	file.Write(src)
-
-	return nil
-}
-
-func (p *Postgres) retrievePrimaryKeys(tableName string) (map[string]bool, error) {
+func (p *Postgres) RetrievePrimaryKeys(table string) (map[string]bool, error) {
 	query :=
 		`
     select
@@ -218,7 +138,7 @@ func (p *Postgres) retrievePrimaryKeys(tableName string) (map[string]bool, error
       information_schema.table_constraints tc
       ,information_schema.constraint_column_usage ccu
     where
-      tc.table_name='` + tableName + `'
+      tc.table_name='` + table + `'
       and
       tc.constraint_type='PRIMARY KEY'
       and
@@ -236,16 +156,17 @@ func (p *Postgres) retrievePrimaryKeys(tableName string) (map[string]bool, error
 		return nil, err
 	}
 
-	primaryKeys := map[string]bool{}
+	var column string
+	pkeys := map[string]bool{}
+
 	for rows.Next() {
-		var columnName string
-		err = rows.Scan(&columnName)
+		err = rows.Scan(&column)
 		if err != nil {
 			return nil, err
 		}
 
-		primaryKeys[columnName] = true
+		pkeys[column] = true
 	}
 
-	return primaryKeys, nil
+	return pkeys, nil
 }

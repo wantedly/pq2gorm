@@ -28,14 +28,14 @@ func main() {
 
 	f.Parse(os.Args[1:])
 
-	var pgURL string
+	var url string
 
 	for 0 < f.NArg() {
-		pgURL = f.Args()[0]
+		url = f.Args()[0]
 		f.Parse(f.Args()[1:])
 	}
 
-	if pgURL == "" {
+	if url == "" {
 		f.Usage()
 		os.Exit(1)
 	}
@@ -47,7 +47,7 @@ func main() {
 
 	fmt.Printf("Connecting to database...\n")
 
-	postgres, err := NewPostgres(pgURL)
+	postgres, err := NewPostgres(url)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

@@ -16,6 +16,13 @@ type Postgres struct {
 	DB *sql.DB
 }
 
+type Field struct {
+	Name     string
+	Type     string
+	Default  string
+	Nullable bool
+}
+
 func NewPostgres(url string) (*Postgres, error) {
 	db, err := sql.Open("postgres", url)
 	if err != nil {
@@ -41,6 +48,57 @@ func (p *Postgres) retrieveTables(targets []string) (*sql.Rows, error) {
 	}
 
 	return p.DB.Query(`select relname as TABLE_NAME from pg_stat_user_tables where relname in (`+strings.Join(qs, ", ")+`)`, params...)
+}
+
+func (p *Postgres) retrieveFields(table string) ([]*Field, error) {
+	query :=
+		`
+    select column_name, data_type, COALESCE(column_default, '') as column_default, is_nullable
+    from information_schema.columns
+    where
+      table_name='` + table + `'
+    order by
+      ordinal_position;
+    `
+
+	rows, err := p.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		columnName       string
+		columnType       string
+		columnDefault    string
+		columnIsNullable string
+	)
+
+	var nullable bool
+
+	fields := []*Field{}
+
+	for rows.Next() {
+		err = rows.Scan(&columnName, &columnType, &columnDefault, &columnIsNullable)
+		if err != nil {
+			return nil, err
+		}
+
+		if columnIsNullable == "YES" {
+			nullable = true
+		} else {
+			nullable = false
+		}
+
+		field := &Field{
+			Name:     columnName,
+			Type:     columnType,
+			Default:  columnDefault,
+			Nullable: nullable,
+		}
+		fields = append(fields, field)
+	}
+
+	return fields, nil
 }
 
 func (p *Postgres) RetrieveTableNames(targets []string) ([]string, error) {
@@ -81,43 +139,22 @@ func (p *Postgres) GenModel(tableName string, outPath string) error {
 		return err
 	}
 
-	query :=
-		`
-    select column_name, data_type, COALESCE(column_default, '') as column_default, is_nullable
-    from information_schema.columns
-    where
-      table_name='` + tableName + `'
-    order by
-      ordinal_position;
-    `
-
-	rows, err := p.DB.Query(query)
+	fields, err := p.retrieveFields(tableName)
 	if err != nil {
 		return err
 	}
 
 	var gormStr string
 	var needTimePackage bool
-	for rows.Next() {
-		var (
-			columnName    string
-			dataType      string
-			columnDefault string
-			isNullable    string
-		)
 
-		err = rows.Scan(&columnName, &dataType, &columnDefault, &isNullable)
-		if err != nil {
-			return err
-		}
-
-		json := genJSON(columnName, columnDefault, primaryKeys)
-		fieldType := gormDataType(dataType)
+	for _, field := range fields {
+		json := genJSON(field.Name, field.Default, primaryKeys)
+		fieldType := gormDataType(field.Type)
 
 		if fieldType == "time.Time" || fieldType == "*time.Time" {
 			needTimePackage = true
 
-			if isNullable == "YES" {
+			if field.Nullable {
 				fieldType = "*time.Time"
 			} else {
 				fieldType = "time.Time"
@@ -128,15 +165,15 @@ func (p *Postgres) GenModel(tableName string, outPath string) error {
 			fieldType = "float32"
 		}
 
-		m := gormColName(columnName) + " " + fieldType + " `" + json + "`\n"
+		m := gormColName(field.Name) + " " + fieldType + " `" + json + "`\n"
 		gormStr += m
 
-		isInfered, infColName := inferORM(columnName)
+		isInfered, infColName := inferORM(field.Name)
 
 		// Add belongs_to relation
 		if isInfered {
 			json := genJSON(strings.ToLower(infColName), "", nil)
-			comment := "// This line is infered from column name \"" + columnName + "\"."
+			comment := "// This line is infered from column name \"" + field.Name + "\"."
 			infColName = gormColName(infColName)
 
 			m := infColName + " *" + infColName + " `" + json + "` " + comment + "\n"

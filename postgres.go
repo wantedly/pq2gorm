@@ -43,7 +43,7 @@ func (p *Postgres) retrieveTables(targets []string) (*sql.Rows, error) {
 	return p.DB.Query(`select relname as TABLE_NAME from pg_stat_user_tables where relname in (`+strings.Join(qs, ", ")+`)`, params...)
 }
 
-func (p *Postgres) GetTableNames(targets []string) ([]string, error) {
+func (p *Postgres) RetrieveTableNames(targets []string) ([]string, error) {
 	var (
 		rows *sql.Rows
 		err  error
@@ -76,7 +76,7 @@ func (p *Postgres) GetTableNames(targets []string) ([]string, error) {
 }
 
 func (p *Postgres) GenModel(tableName string, outPath string) error {
-	primaryKeys, err := p.getPrimaryKeys(tableName)
+	primaryKeys, err := p.retrievePrimaryKeys(tableName)
 	if err != nil {
 		return err
 	}
@@ -172,7 +172,7 @@ func (p *Postgres) GenModel(tableName string, outPath string) error {
 	return nil
 }
 
-func (p *Postgres) getPrimaryKeys(tableName string) (map[string]bool, error) {
+func (p *Postgres) retrievePrimaryKeys(tableName string) (map[string]bool, error) {
 	query :=
 		`
     select

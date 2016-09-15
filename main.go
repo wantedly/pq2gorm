@@ -60,7 +60,7 @@ func main() {
 		}
 	}
 
-	tables, err := postgres.GetTableNames(targets)
+	tables, err := postgres.RetrieveTableNames(targets)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

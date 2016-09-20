@@ -1,8 +1,6 @@
 NAME := pq2gorm
 LDFLAGS := -ldflags="-s -w"
 
-GLIDE := $(shell command -v glide 2> /dev/null)
-
 .DEFAULT_GOAL := bin/$(NAME)
 
 bin/$(NAME): deps
@@ -33,7 +31,7 @@ generate-test:
 
 .PHONY: glide
 glide:
-ifndef GLIDE
+ifeq ($(shell command -v glide 2> /dev/null),)
 	curl https://glide.sh/get | sh
 endif
 

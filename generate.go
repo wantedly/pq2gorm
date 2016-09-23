@@ -1,11 +1,106 @@
 package main
 
 import (
+	"bytes"
+	"go/format"
+	"io/ioutil"
+	"path/filepath"
 	"strings"
+	"text/template"
 
 	"github.com/gedex/inflector"
 	"github.com/serenize/snaker"
 )
+
+type TemplateField struct {
+	Name    string
+	Type    string
+	Tag     string
+	Comment string
+}
+
+type TemplateParams struct {
+	Name            string
+	Fields          []*TemplateField
+	NeedTimePackage bool
+}
+
+func GenerateModel(table string, pkeys map[string]bool, fields []*Field, outPath string) error {
+	var needTimePackage bool
+
+	templateFields := []*TemplateField{}
+
+	for _, field := range fields {
+		fieldType := gormDataType(field.Type)
+
+		if fieldType == "time.Time" || fieldType == "*time.Time" {
+			needTimePackage = true
+
+			if field.Nullable {
+				fieldType = "*time.Time"
+			} else {
+				fieldType = "time.Time"
+			}
+		}
+
+		if fieldType == "double precision" {
+			fieldType = "float32"
+		}
+
+		templateFields = append(templateFields, &TemplateField{
+			Name: gormColumnName(field.Name),
+			Type: fieldType,
+			Tag:  genJSON(field.Name, field.Default, pkeys),
+		})
+
+		isInfered, infColName := inferORM(field.Name)
+
+		// Add belongs_to relation
+		if isInfered {
+			templateFields = append(templateFields, &TemplateField{
+				Name:    gormColumnName(infColName),
+				Type:    "*" + gormColumnName(infColName),
+				Tag:     genJSON(strings.ToLower(infColName), "", nil),
+				Comment: "This line is infered from column name \"" + field.Name + "\".",
+			})
+		}
+	}
+
+	params := &TemplateParams{
+		Name:            gormTableName(table),
+		Fields:          templateFields,
+		NeedTimePackage: needTimePackage,
+	}
+
+	body, err := Asset("_templates/model.go.tmpl")
+	if err != nil {
+		return err
+	}
+
+	tmpl, err := template.New("").Parse(string(body))
+	if err != nil {
+		return err
+	}
+
+	var buf bytes.Buffer
+
+	if err := tmpl.Execute(&buf, params); err != nil {
+		return err
+	}
+
+	src, err := format.Source(buf.Bytes())
+	if err != nil {
+		return err
+	}
+
+	modelFile := filepath.Join(outPath, inflector.Singularize(table)+".go")
+
+	if err := ioutil.WriteFile(modelFile, src, 0644); err != nil {
+		return err
+	}
+
+	return nil
+}
 
 // Infer belongs_to Relation from column's name
 func inferORM(s string) (bool, string) {
@@ -60,7 +155,7 @@ func gormTableName(s string) string {
 }
 
 // Ex: facebook_uid → FacebookUID
-func gormColName(s string) string {
+func gormColumnName(s string) string {
 	s = strings.ToLower(s)
 	ss := strings.Split(s, "_")
 
@@ -71,6 +166,7 @@ func gormColName(s string) string {
 
 		ss[i] = strings.Title(word)
 	}
+
 	return strings.Join(ss, "")
 }
 

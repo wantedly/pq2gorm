@@ -1,14 +1,13 @@
 package main
 
 import (
-	"database/sql"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
-
-	_ "github.com/lib/pq"
 )
+
+//go:generate go-bindata _templates/
 
 func main() {
 	var (
@@ -19,7 +18,11 @@ func main() {
 	f := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
 	f.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: "+os.Args[0]+" <PostgreSQL URL> [<options>]\n\nOptions:\n")
+		fmt.Fprintf(os.Stderr, `Usage of %s:
+  %s <PostgreSQL URL> [<options>]
+
+Options:
+`, os.Args[0], os.Args[0])
 		f.PrintDefaults() // Print usage of options
 	}
 	f.StringVar(&dir, "dir", "./", "Set output path")
@@ -29,14 +32,14 @@ func main() {
 
 	f.Parse(os.Args[1:])
 
-	var pgURL string
+	var url string
 
 	for 0 < f.NArg() {
-		pgURL = f.Args()[0]
+		url = f.Args()[0]
 		f.Parse(f.Args()[1:])
 	}
 
-	if pgURL == "" {
+	if url == "" {
 		f.Usage()
 		os.Exit(1)
 	}
@@ -46,14 +49,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Connecting to database...\n")
+	fmt.Println("Connecting to database...")
 
-	db, err := sql.Open("postgres", pgURL)
+	postgres, err := NewPostgres(url)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer postgres.DB.Close()
 
 	var targets []string
 
@@ -63,16 +66,28 @@ func main() {
 		}
 	}
 
-	tables, err := getTableNames(db, targets)
+	tables, err := postgres.RetrieveTables(targets)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	for _, tableName := range tables {
-		fmt.Printf("Table name: %s\n", tableName)
+	for _, table := range tables {
+		fmt.Println("Table name: " + table)
 
-		if err := genModel(tableName, dir, db); err != nil {
+		pkeys, err := postgres.RetrievePrimaryKeys(table)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+
+		fields, err := postgres.RetrieveFields(table)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+
+		if err := GenerateModel(table, pkeys, fields, dir); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}

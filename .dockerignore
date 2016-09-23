@@ -4,3 +4,4 @@ LICENSE
 vendor
 out
 testdata/db.dump
+bindata.go

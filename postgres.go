@@ -2,21 +2,39 @@ package main
 
 import (
 	"database/sql"
-	"go/format"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/gedex/inflector"
 	_ "github.com/lib/pq"
 )
 
-func retrieveAllTables(db *sql.DB) (*sql.Rows, error) {
-	return db.Query(`select relname as TABLE_NAME from pg_stat_user_tables`)
+type Postgres struct {
+	DB *sql.DB
 }
 
-func retrieveTables(db *sql.DB, targets []string) (*sql.Rows, error) {
+type Field struct {
+	Name     string
+	Type     string
+	Default  string
+	Nullable bool
+}
+
+func NewPostgres(url string) (*Postgres, error) {
+	db, err := sql.Open("postgres", url)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Postgres{
+		DB: db,
+	}, nil
+}
+
+func (p *Postgres) retrieveAllTables() (*sql.Rows, error) {
+	return p.DB.Query(`select relname as TABLE_NAME from pg_stat_user_tables`)
+}
+
+func (p *Postgres) retrieveSelectedTables(targets []string) (*sql.Rows, error) {
 	qs := []string{}
 	params := []interface{}{}
 
@@ -25,139 +43,94 @@ func retrieveTables(db *sql.DB, targets []string) (*sql.Rows, error) {
 		params = append(params, t)
 	}
 
-	return db.Query(`select relname as TABLE_NAME from pg_stat_user_tables where relname in (`+strings.Join(qs, ", ")+`)`, params...)
+	return p.DB.Query(`select relname as TABLE_NAME from pg_stat_user_tables where relname in (`+strings.Join(qs, ", ")+`)`, params...)
 }
 
-func getTableNames(db *sql.DB, targets []string) ([]string, error) {
+func (p *Postgres) RetrieveFields(table string) ([]*Field, error) {
+	query :=
+		`
+    select column_name, data_type, COALESCE(column_default, '') as column_default, is_nullable
+    from information_schema.columns
+    where
+      table_name='` + table + `'
+    order by
+      ordinal_position;
+    `
+
+	rows, err := p.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		columnName       string
+		columnType       string
+		columnDefault    string
+		columnIsNullable string
+	)
+
+	var nullable bool
+
+	fields := []*Field{}
+
+	for rows.Next() {
+		err = rows.Scan(&columnName, &columnType, &columnDefault, &columnIsNullable)
+		if err != nil {
+			return nil, err
+		}
+
+		if columnIsNullable == "YES" {
+			nullable = true
+		} else {
+			nullable = false
+		}
+
+		field := &Field{
+			Name:     columnName,
+			Type:     columnType,
+			Default:  columnDefault,
+			Nullable: nullable,
+		}
+		fields = append(fields, field)
+	}
+
+	return fields, nil
+}
+
+func (p *Postgres) RetrieveTables(targets []string) ([]string, error) {
 	var (
 		rows *sql.Rows
 		err  error
 	)
 
 	if len(targets) == 0 {
-		rows, err = retrieveAllTables(db)
+		rows, err = p.retrieveAllTables()
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		rows, err = retrieveTables(db, targets)
+		rows, err = p.retrieveSelectedTables(targets)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	tableNames := []string{}
+	tables := []string{}
+	var table string
+
 	for rows.Next() {
-		var tableName string
-		err = rows.Scan(&tableName)
+		err = rows.Scan(&table)
 		if err != nil {
 			return nil, err
 		}
 
-		tableNames = append(tableNames, tableName)
+		tables = append(tables, table)
 	}
 
-	return tableNames, nil
+	return tables, nil
 }
 
-func genModel(tableName string, outPath string, db *sql.DB) error {
-	primaryKeys, err := getPrimaryKeys(tableName, db)
-	if err != nil {
-		return err
-	}
-
-	query :=
-		`
-    select column_name, data_type, COALESCE(column_default, '') as column_default, is_nullable
-    from information_schema.columns
-    where
-      table_name='` + tableName + `'
-    order by
-      ordinal_position;
-    `
-
-	rows, err := db.Query(query)
-	if err != nil {
-		return err
-	}
-
-	var gormStr string
-	var needTimePackage bool
-	for rows.Next() {
-		var (
-			columnName    string
-			dataType      string
-			columnDefault string
-			isNullable    string
-		)
-
-		err = rows.Scan(&columnName, &dataType, &columnDefault, &isNullable)
-		if err != nil {
-			return err
-		}
-
-		json := genJSON(columnName, columnDefault, primaryKeys)
-		fieldType := gormDataType(dataType)
-
-		if fieldType == "time.Time" || fieldType == "*time.Time" {
-			needTimePackage = true
-
-			if isNullable == "YES" {
-				fieldType = "*time.Time"
-			} else {
-				fieldType = "time.Time"
-			}
-		}
-
-		if fieldType == "double precision" {
-			fieldType = "float32"
-		}
-
-		m := gormColName(columnName) + " " + fieldType + " `" + json + "`\n"
-		gormStr += m
-
-		isInfered, infColName := inferORM(columnName)
-
-		// Add belongs_to relation
-		if isInfered {
-			json := genJSON(strings.ToLower(infColName), "", nil)
-			comment := "// This line is infered from column name \"" + columnName + "\"."
-			infColName = gormColName(infColName)
-
-			m := infColName + " *" + infColName + " `" + json + "` " + comment + "\n"
-			gormStr += m
-		}
-	}
-
-	var importPackage string
-	if needTimePackage {
-		importPackage = "import \"time\"\n\n"
-	} else {
-		importPackage = ""
-	}
-
-	gormStr = "package models\n\n" + importPackage + "type " + gormTableName(tableName) + " struct {\n" + gormStr + "}\n"
-
-	modelFile := filepath.Join(outPath, inflector.Singularize(tableName)+".go")
-	file, err := os.Create(modelFile)
-
-	if err != nil {
-		return err
-	}
-
-	defer file.Close()
-
-	src, err := format.Source(([]byte)(gormStr))
-	if err != nil {
-		return err
-	}
-
-	file.Write(src)
-
-	return nil
-}
-
-func getPrimaryKeys(tableName string, db *sql.DB) (map[string]bool, error) {
+func (p *Postgres) RetrievePrimaryKeys(table string) (map[string]bool, error) {
 	query :=
 		`
     select
@@ -166,7 +139,7 @@ func getPrimaryKeys(tableName string, db *sql.DB) (map[string]bool, error) {
       information_schema.table_constraints tc
       ,information_schema.constraint_column_usage ccu
     where
-      tc.table_name='` + tableName + `'
+      tc.table_name='` + table + `'
       and
       tc.constraint_type='PRIMARY KEY'
       and
@@ -179,21 +152,22 @@ func getPrimaryKeys(tableName string, db *sql.DB) (map[string]bool, error) {
       tc.constraint_name=ccu.constraint_name
     `
 
-	rows, err := db.Query(query)
+	rows, err := p.DB.Query(query)
 	if err != nil {
 		return nil, err
 	}
 
-	primaryKeys := map[string]bool{}
+	var column string
+	pkeys := map[string]bool{}
+
 	for rows.Next() {
-		var columnName string
-		err = rows.Scan(&columnName)
+		err = rows.Scan(&column)
 		if err != nil {
 			return nil, err
 		}
 
-		primaryKeys[columnName] = true
+		pkeys[column] = true
 	}
 
-	return primaryKeys, nil
+	return pkeys, nil
 }

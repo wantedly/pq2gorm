@@ -1,12 +1,10 @@
 NAME := pq2gorm
-SRC := $(shell find . -type f -name "*.go")
 LDFLAGS := -ldflags="-s -w"
-
-GLIDE := $(shell command -v glide 2> /dev/null)
 
 .DEFAULT_GOAL := bin/$(NAME)
 
-bin/$(NAME): deps $(SRC)
+bin/$(NAME): deps
+	go generate
 	go build $(LDFLAGS) -o bin/$(NAME)
 
 .PHONY: clean
@@ -16,6 +14,7 @@ clean:
 
 .PHONY: deps
 deps: glide
+	go get github.com/jteeuwen/go-bindata/...
 	glide install
 
 .PHONY: generate-test
@@ -32,16 +31,18 @@ generate-test:
 
 .PHONY: glide
 glide:
-ifndef GLIDE
+ifeq ($(shell command -v glide 2> /dev/null),)
 	curl https://glide.sh/get | sh
 endif
 
 .PHONY: install
 install:
+	go generate
 	go install $(LDFLAGS)
 
 .PHONY: test
 test:
+	go generate
 	go test -v
 
 .PHONY: update-deps

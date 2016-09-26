@@ -91,7 +91,7 @@ Options:
 		// 	fmt.Fprintln(os.Stderr, err)
 		// 	os.Exit(1)
 		// }
-		params := GenerateModel(table, pkeys, fields, dir)
+		params := GenerateModel(table, pkeys, fields)
 		SaveModel(table, params, dir)
 	}
 

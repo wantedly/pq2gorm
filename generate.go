@@ -29,7 +29,7 @@ type TemplateParams struct {
 
 var hasMany = make(map[string][]string)
 
-func GenerateModel(table string, pkeys map[string]bool, fields []*Field, outPath string) *TemplateParams {
+func GenerateModel(table string, pkeys map[string]bool, fields []*Field) *TemplateParams {
 	var needTimePackage bool
 
 	templateFields := []*TemplateField{}

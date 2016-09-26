@@ -83,15 +83,15 @@ func GenerateModel(table string, pkeys map[string]bool, fields []*Field) *Templa
 }
 
 func AddHasMany(table string, params *TemplateParams) {
-	fmt.Println(hasMany)
 	templateFields := params.Fields
 
-	//fmt.Println(params)
+	fmt.Println(templateFields)
 
 	if _, ok := hasMany[params.Name]; ok {
 		fmt.Println("ok!")
 		fmt.Println(hasMany[params.Name])
 		for _, infColName := range hasMany[params.Name] {
+			fmt.Println(infColName)
 			templateFields = append(templateFields, &TemplateField{
 				Name:    gormColumnName(infColName),
 				Type:    "[]*" + gormTableName(infColName),
@@ -99,8 +99,9 @@ func AddHasMany(table string, params *TemplateParams) {
 				Comment: "This line is infered from other table.",
 			})
 		}
-
 	}
+
+	params.Fields = templateFields
 }
 
 func SaveModel(table string, params *TemplateParams, outPath string) error {

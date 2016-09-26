@@ -8,6 +8,8 @@ import (
 	"strings"
 	"text/template"
 
+	//"fmt" // for debug
+
 	"github.com/gedex/inflector"
 	"github.com/serenize/snaker"
 )
@@ -25,7 +27,9 @@ type TemplateParams struct {
 	NeedTimePackage bool
 }
 
-func GenerateModel(table string, pkeys map[string]bool, fields []*Field, outPath string) error {
+var hasMany = make(map[string][]string)
+
+func GenerateModel(table string, pkeys map[string]bool, fields []*Field, outPath string) *TemplateParams {
 	var needTimePackage bool
 
 	templateFields := []*TemplateField{}
@@ -63,8 +67,14 @@ func GenerateModel(table string, pkeys map[string]bool, fields []*Field, outPath
 				Tag:     genJSON(strings.ToLower(infColName), "", nil),
 				Comment: "This line is infered from column name \"" + field.Name + "\".",
 			})
+
+			// Add has_many relation
+			hasMany[infColName] = append(hasMany[infColName], table)
 		}
 	}
+
+	// debug
+	//fmt.Println(hasMany)
 
 	params := &TemplateParams{
 		Name:            gormTableName(table),
@@ -72,6 +82,14 @@ func GenerateModel(table string, pkeys map[string]bool, fields []*Field, outPath
 		NeedTimePackage: needTimePackage,
 	}
 
+	return params
+}
+
+func AddHasMany(table string) error{
+	return nil
+}
+
+func SaveModel(table string, params *TemplateParams, outPath string) error{
 	body, err := Asset("_templates/model.go.tmpl")
 	if err != nil {
 		return err

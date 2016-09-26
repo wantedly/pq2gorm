@@ -8,8 +8,6 @@ import (
 	"strings"
 	"text/template"
 
-	"fmt" // for debug
-
 	"github.com/gedex/inflector"
 	"github.com/serenize/snaker"
 )
@@ -82,17 +80,10 @@ func GenerateModel(table string, pkeys map[string]bool, fields []*Field) *Templa
 	return params
 }
 
-func AddHasMany(table string, params *TemplateParams) {
-	templateFields := params.Fields
-
-	fmt.Println(templateFields)
-
+func AddHasMany(params *TemplateParams) {
 	if _, ok := hasMany[params.Name]; ok {
-		fmt.Println("ok!")
-		fmt.Println(hasMany[params.Name])
 		for _, infColName := range hasMany[params.Name] {
-			fmt.Println(infColName)
-			templateFields = append(templateFields, &TemplateField{
+			params.Fields = append(params.Fields, &TemplateField{
 				Name:    gormColumnName(infColName),
 				Type:    "[]*" + gormTableName(infColName),
 				Tag:     genJSON(strings.ToLower(infColName), "", nil),
@@ -100,8 +91,6 @@ func AddHasMany(table string, params *TemplateParams) {
 			})
 		}
 	}
-
-	params.Fields = templateFields
 }
 
 func SaveModel(table string, params *TemplateParams, outPath string) error {

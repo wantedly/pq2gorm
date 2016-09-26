@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	//"fmt" // for debug
 
 	"github.com/gedex/inflector"
 	"github.com/serenize/snaker"
@@ -25,7 +26,9 @@ type TemplateParams struct {
 	NeedTimePackage bool
 }
 
-func GenerateModel(table string, pkeys map[string]bool, fields []*Field, outPath string) error {
+var hasMany = make(map[string][]string)
+
+func GenerateModel(table string, pkeys map[string]bool, fields []*Field, tables []string) *TemplateParams {
 	var needTimePackage bool
 
 	templateFields := []*TemplateField{}
@@ -53,7 +56,7 @@ func GenerateModel(table string, pkeys map[string]bool, fields []*Field, outPath
 			Tag:  genJSON(field.Name, field.Default, pkeys),
 		})
 
-		isInfered, infColName := inferORM(field.Name)
+		isInfered, infColName := inferORM(field.Name, tables)
 
 		// Add belongs_to relation
 		if isInfered {
@@ -63,6 +66,9 @@ func GenerateModel(table string, pkeys map[string]bool, fields []*Field, outPath
 				Tag:     genJSON(strings.ToLower(infColName), "", nil),
 				Comment: "This line is infered from column name \"" + field.Name + "\".",
 			})
+
+			// Add has_many relation
+			hasMany[gormColumnName(infColName)] = append(hasMany[gormColumnName(infColName)], table)
 		}
 	}
 
@@ -72,6 +78,23 @@ func GenerateModel(table string, pkeys map[string]bool, fields []*Field, outPath
 		NeedTimePackage: needTimePackage,
 	}
 
+	return params
+}
+
+func AddHasMany(params *TemplateParams) {
+	if _, ok := hasMany[params.Name]; ok {
+		for _, infColName := range hasMany[params.Name] {
+			params.Fields = append(params.Fields, &TemplateField{
+				Name:    gormColumnName(infColName),
+				Type:    "[]*" + gormTableName(infColName),
+				Tag:     genJSON(strings.ToLower(infColName), "", nil),
+				Comment: "This line is infered from other tables.",
+			})
+		}
+	}
+}
+
+func SaveModel(table string, params *TemplateParams, outPath string) error {
 	body, err := Asset("_templates/model.go.tmpl")
 	if err != nil {
 		return err
@@ -103,7 +126,7 @@ func GenerateModel(table string, pkeys map[string]bool, fields []*Field, outPath
 }
 
 // Infer belongs_to Relation from column's name
-func inferORM(s string) (bool, string) {
+func inferORM(s string, tables []string) (bool, string) {
 	s = strings.ToLower(s)
 	ss := strings.Split(s, "_")
 
@@ -123,6 +146,23 @@ func inferORM(s string) (bool, string) {
 	}
 
 	infColName := strings.Join(newSS, "_")
+
+	// Check the table is existed or not
+	tableName := snaker.CamelToSnake(infColName)
+	tableName = inflector.Pluralize(tableName)
+	//fmt.Println(tableName)
+
+	exist := false
+	for _, table := range tables {
+		if table == tableName {
+			exist = true
+		}
+	}
+
+	if !exist {
+		return false, ""
+	}
+
 	return true, infColName
 }
 

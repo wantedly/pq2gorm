@@ -89,7 +89,7 @@ Options:
 			os.Exit(1)
 		}
 
-		paramsS = append(paramsS, GenerateModel(table, pkeys, fields))
+		paramsS = append(paramsS, GenerateModel(table, pkeys, fields, tables))
 	}
 
 	for i, table := range tables {

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"text/template"
 
-	//"fmt" // for debug
+	"fmt" // for debug
 
 	"github.com/gedex/inflector"
 	"github.com/serenize/snaker"
@@ -69,12 +69,9 @@ func GenerateModel(table string, pkeys map[string]bool, fields []*Field) *Templa
 			})
 
 			// Add has_many relation
-			hasMany[infColName] = append(hasMany[infColName], table)
+			hasMany[gormColumnName(infColName)] = append(hasMany[gormColumnName(infColName)], table)
 		}
 	}
-
-	// debug
-	//fmt.Println(hasMany)
 
 	params := &TemplateParams{
 		Name:            gormTableName(table),
@@ -85,11 +82,28 @@ func GenerateModel(table string, pkeys map[string]bool, fields []*Field) *Templa
 	return params
 }
 
-func AddHasMany(table string) error{
-	return nil
+func AddHasMany(table string, params *TemplateParams) {
+	fmt.Println(hasMany)
+	templateFields := params.Fields
+
+	//fmt.Println(params)
+
+	if _, ok := hasMany[params.Name]; ok {
+		fmt.Println("ok!")
+		fmt.Println(hasMany[params.Name])
+		for _, infColName := range hasMany[params.Name] {
+			templateFields = append(templateFields, &TemplateField{
+				Name:    gormColumnName(infColName),
+				Type:    "[]*" + gormTableName(infColName),
+				Tag:     genJSON(strings.ToLower(infColName), "", nil),
+				Comment: "This line is infered from other table.",
+			})
+		}
+
+	}
 }
 
-func SaveModel(table string, params *TemplateParams, outPath string) error{
+func SaveModel(table string, params *TemplateParams, outPath string) error {
 	body, err := Asset("_templates/model.go.tmpl")
 	if err != nil {
 		return err

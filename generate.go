@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	//"fmt" // for debug
 
 	"github.com/gedex/inflector"
 	"github.com/serenize/snaker"
@@ -27,7 +28,7 @@ type TemplateParams struct {
 
 var hasMany = make(map[string][]string)
 
-func GenerateModel(table string, pkeys map[string]bool, fields []*Field) *TemplateParams {
+func GenerateModel(table string, pkeys map[string]bool, fields []*Field, tables []string) *TemplateParams {
 	var needTimePackage bool
 
 	templateFields := []*TemplateField{}
@@ -55,7 +56,7 @@ func GenerateModel(table string, pkeys map[string]bool, fields []*Field) *Templa
 			Tag:  genJSON(field.Name, field.Default, pkeys),
 		})
 
-		isInfered, infColName := inferORM(field.Name)
+		isInfered, infColName := inferORM(field.Name, tables)
 
 		// Add belongs_to relation
 		if isInfered {
@@ -87,7 +88,7 @@ func AddHasMany(params *TemplateParams) {
 				Name:    gormColumnName(infColName),
 				Type:    "[]*" + gormTableName(infColName),
 				Tag:     genJSON(strings.ToLower(infColName), "", nil),
-				Comment: "This line is infered from other table.",
+				Comment: "This line is infered from other tables.",
 			})
 		}
 	}
@@ -125,7 +126,7 @@ func SaveModel(table string, params *TemplateParams, outPath string) error {
 }
 
 // Infer belongs_to Relation from column's name
-func inferORM(s string) (bool, string) {
+func inferORM(s string, tables []string) (bool, string) {
 	s = strings.ToLower(s)
 	ss := strings.Split(s, "_")
 
@@ -145,6 +146,23 @@ func inferORM(s string) (bool, string) {
 	}
 
 	infColName := strings.Join(newSS, "_")
+
+	// Check the table is existed or not
+	tableName := snaker.CamelToSnake(infColName)
+	tableName = inflector.Pluralize(tableName)
+	//fmt.Println(tableName)
+
+	exist := false
+	for _, table := range tables {
+		if table == tableName {
+			exist = true
+		}
+	}
+
+	if !exist {
+		return false, ""
+	}
+
 	return true, infColName
 }
 

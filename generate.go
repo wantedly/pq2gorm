@@ -5,9 +5,9 @@ import (
 	"go/format"
 	"io/ioutil"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
-	//"fmt" // for debug
 
 	"github.com/gedex/inflector"
 	"github.com/serenize/snaker"
@@ -150,13 +150,14 @@ func inferORM(s string, tables []string) (bool, string) {
 	// Check the table is existed or not
 	tableName := snaker.CamelToSnake(infColName)
 	tableName = inflector.Pluralize(tableName)
-	//fmt.Println(tableName)
 
 	exist := false
-	for _, table := range tables {
-		if table == tableName {
-			exist = true
-		}
+
+	sort.Strings(tables)
+	i := sort.Search(len(tables),
+		func(i int) bool { return tables[i] >= tableName })
+	if i < len(tables) && tables[i] == tableName {
+		exist = true
 	}
 
 	if !exist {

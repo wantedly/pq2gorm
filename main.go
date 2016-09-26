@@ -87,9 +87,17 @@ Options:
 			os.Exit(1)
 		}
 
-		if err := GenerateModel(table, pkeys, fields, dir); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+		// if err := GenerateModel(table, pkeys, fields, dir); err != nil {
+		// 	fmt.Fprintln(os.Stderr, err)
+		// 	os.Exit(1)
+		// }
+		params := GenerateModel(table, pkeys, fields, dir)
+		SaveModel(table, params, dir)
+	}
+
+	for _, table := range tables {
+		fmt.Println("Add relation for Table name: " + table)
+
+		AddHasMany(table)
 	}
 }

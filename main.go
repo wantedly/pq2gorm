@@ -72,6 +72,8 @@ Options:
 		os.Exit(1)
 	}
 
+	paramsS := []*TemplateParams{}
+
 	for _, table := range tables {
 		fmt.Println("Table name: " + table)
 
@@ -87,17 +89,13 @@ Options:
 			os.Exit(1)
 		}
 
-		// if err := GenerateModel(table, pkeys, fields, dir); err != nil {
-		// 	fmt.Fprintln(os.Stderr, err)
-		// 	os.Exit(1)
-		// }
-		params := GenerateModel(table, pkeys, fields)
-		SaveModel(table, params, dir)
+		paramsS = append(paramsS, GenerateModel(table, pkeys, fields))
 	}
 
-	for _, table := range tables {
+	for i, table := range tables {
 		fmt.Println("Add relation for Table name: " + table)
 
-		AddHasMany(table)
+		AddHasMany(table, paramsS[i])
+		SaveModel(table, paramsS[i], dir)
 	}
 }

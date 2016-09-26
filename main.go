@@ -95,7 +95,7 @@ Options:
 	for i, table := range tables {
 		fmt.Println("Add relation for Table name: " + table)
 
-		AddHasMany(table, paramsS[i])
+		AddHasMany(paramsS[i])
 		SaveModel(table, paramsS[i], dir)
 	}
 }

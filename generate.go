@@ -57,17 +57,19 @@ func GenerateModel(table string, pkeys map[string]bool, fields []*Field, tables 
 
 		isInfered, infColName := inferORM(field.Name, tables)
 
+		colName := gormColumnName(infColName)
+
 		// Add belongs_to relation
 		if isInfered {
 			templateFields = append(templateFields, &TemplateField{
-				Name:    gormColumnName(infColName),
-				Type:    "*" + gormColumnName(infColName),
+				Name:    colName,
+				Type:    "*" + colName,
 				Tag:     genJSON(strings.ToLower(infColName), "", nil),
 				Comment: "This line is infered from column name \"" + field.Name + "\".",
 			})
 
 			// Add has_many relation
-			hasMany[gormColumnName(infColName)] = append(hasMany[gormColumnName(infColName)], table)
+			hasMany[colName] = append(hasMany[colName], table)
 		}
 	}
 

@@ -5,6 +5,7 @@ import (
 	"go/format"
 	"io/ioutil"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -153,10 +154,12 @@ func inferORM(s string, tables []string) (bool, string) {
 	tableName = inflector.Pluralize(tableName)
 
 	exist := false
-	for _, table := range tables {
-		if table == tableName {
-			exist = true
-		}
+
+	sort.Strings(tables)
+	i := sort.Search(len(tables),
+		func(i int) bool { return tables[i] >= tableName })
+	if i < len(tables) && tables[i] == tableName {
+		exist = true
 	}
 
 	if !exist {
